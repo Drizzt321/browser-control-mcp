@@ -2,10 +2,21 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { BrowserAPI } from "./browser-api";
+import { Adapter } from "./adapter";
+import { StaticSessionManager } from "./session";
+import { SingleSessionOwnership } from "./tab-ownership";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
 dayjs.extend(relativeTime);
+
+const sessionManager = new StaticSessionManager();
+const tabOwnership = new SingleSessionOwnership();
+const adapter = new Adapter(sessionManager, tabOwnership);
+
+function getSessionId(): string {
+  return sessionManager.getActiveSession()!.id;
+}
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
@@ -17,21 +28,23 @@ mcpServer.tool(
   "Open a new tab in the user's browser (useful when the user asks to open a website)",
   { url: z.string() },
   async ({ url }) => {
-    const openedTabId = await browserApi.openTab(url);
-    if (openedTabId !== undefined) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${url} opened in tab id ${openedTabId}`,
-          },
-        ],
-      };
-    } else {
-      return {
-        content: [{ type: "text", text: "Failed to open tab", isError: true }],
-      };
-    }
+    return adapter.execute(getSessionId(), "open-browser-tab", {}, async () => {
+      const openedTabId = await browserApi.openTab(url);
+      if (openedTabId !== undefined) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${url} opened in tab id ${openedTabId}`,
+            },
+          ],
+        };
+      } else {
+        return {
+          content: [{ type: "text", text: "Failed to open tab", isError: true }],
+        };
+      }
+    });
   }
 );
 
@@ -40,10 +53,12 @@ mcpServer.tool(
   "Close tabs in the user's browser by tab IDs",
   { tabIds: z.array(z.number()) },
   async ({ tabIds }) => {
-    await browserApi.closeTabs(tabIds);
-    return {
-      content: [{ type: "text", text: "Closed tabs" }],
-    };
+    return adapter.execute(getSessionId(), "close-browser-tabs", {}, async () => {
+      await browserApi.closeTabs(tabIds);
+      return {
+        content: [{ type: "text", text: "Closed tabs" }],
+      };
+    });
   }
 );
 
@@ -55,6 +70,7 @@ mcpServer.tool(
     limit: z.number().default(100).describe("Maximum number of tabs to return (default: 100, max: 500)"),
   },
   async ({ offset, limit }) => {
+    return adapter.execute(getSessionId(), "get-list-of-open-tabs", {}, async () => {
     // Validate and cap the limit
     const effectiveLimit = Math.min(Math.max(1, limit), 500);
 
@@ -85,6 +101,7 @@ mcpServer.tool(
     return {
       content: [paginationInfo, ...tabContent],
     };
+    });
   }
 );
 
@@ -93,28 +110,28 @@ mcpServer.tool(
   "Get the list of recent browser history (to get all, don't use searchQuery)",
   { searchQuery: z.string().optional() },
   async ({ searchQuery }) => {
-    const browserHistory = await browserApi.getBrowserRecentHistory(
-      searchQuery
-    );
-    if (browserHistory.length > 0) {
-      return {
-        content: browserHistory.map((item) => {
-          let lastVisited = "unknown";
-          if (item.lastVisitTime) {
-            lastVisited = dayjs(item.lastVisitTime).fromNow(); // LLM-friendly time ago
-          }
-          return {
-            type: "text",
-            text: `url=${item.url}, title="${item.title}", lastVisitTime=${lastVisited}`,
-          };
-        }),
-      };
-    } else {
-      // If nothing was found for the search query, hint the AI to list
-      // all the recent history items instead.
-      const hint = searchQuery ? "Try without a searchQuery" : "";
-      return { content: [{ type: "text", text: `No history found. ${hint}` }] };
-    }
+    return adapter.execute(getSessionId(), "get-recent-browser-history", {}, async () => {
+      const browserHistory = await browserApi.getBrowserRecentHistory(
+        searchQuery
+      );
+      if (browserHistory.length > 0) {
+        return {
+          content: browserHistory.map((item) => {
+            let lastVisited = "unknown";
+            if (item.lastVisitTime) {
+              lastVisited = dayjs(item.lastVisitTime).fromNow(); // LLM-friendly time ago
+            }
+            return {
+              type: "text",
+              text: `url=${item.url}, title="${item.title}", lastVisitTime=${lastVisited}`,
+            };
+          }),
+        };
+      } else {
+        const hint = searchQuery ? "Try without a searchQuery" : "";
+        return { content: [{ type: "text", text: `No history found. ${hint}` }] };
+      }
+    });
   }
 );
 
@@ -126,6 +143,7 @@ mcpServer.tool(
   `,
   { tabId: z.number(), offset: z.number().default(0) },
   async ({ tabId, offset }) => {
+    return adapter.execute(getSessionId(), "get-tab-web-content", { tabId }, async () => {
     const content = await browserApi.getTabContent(tabId, offset);
     let links: { type: "text"; text: string }[] = [];
     if (offset === 0) {
@@ -160,6 +178,7 @@ mcpServer.tool(
     return {
       content: [...hint, { type: "text", text }, ...links],
     };
+    });
   }
 );
 
@@ -168,12 +187,14 @@ mcpServer.tool(
   "Change the order of open browser tabs",
   { tabOrder: z.array(z.number()) },
   async ({ tabOrder }) => {
-    const newOrder = await browserApi.reorderTabs(tabOrder);
-    return {
-      content: [
-        { type: "text", text: `Tabs reordered: ${newOrder.join(", ")}` },
-      ],
-    };
+    return adapter.execute(getSessionId(), "reorder-browser-tabs", {}, async () => {
+      const newOrder = await browserApi.reorderTabs(tabOrder);
+      return {
+        content: [
+          { type: "text", text: `Tabs reordered: ${newOrder.join(", ")}` },
+        ],
+      };
+    });
   }
 );
 
@@ -182,15 +203,17 @@ mcpServer.tool(
   "Find and highlight text in a browser tab (use a query phrase that exists in the web content)",
   { tabId: z.number(), queryPhrase: z.string() },
   async ({ tabId, queryPhrase }) => {
-    const noOfResults = await browserApi.findHighlight(tabId, queryPhrase);
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Number of results found and highlighted in the tab: ${noOfResults}`,
-        },
-      ],
-    };
+    return adapter.execute(getSessionId(), "find-highlight-in-browser-tab", { tabId }, async () => {
+      const noOfResults = await browserApi.findHighlight(tabId, queryPhrase);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Number of results found and highlighted in the tab: ${noOfResults}`,
+          },
+        ],
+      };
+    });
   }
 );
 
@@ -216,20 +239,22 @@ mcpServer.tool(
     groupTitle: z.string().default("New Group"),
   },
   async ({ tabIds, isCollapsed, groupColor, groupTitle }) => {
-    const groupId = await browserApi.groupTabs(
-      tabIds,
-      isCollapsed,
-      groupColor,
-      groupTitle
-    );
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Created tab group "${groupTitle}" with ${tabIds.length} tabs (group ID: ${groupId})`,
-        },
-      ],
-    };
+    return adapter.execute(getSessionId(), "group-browser-tabs", {}, async () => {
+      const groupId = await browserApi.groupTabs(
+        tabIds,
+        isCollapsed,
+        groupColor,
+        groupTitle
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Created tab group "${groupTitle}" with ${tabIds.length} tabs (group ID: ${groupId})`,
+          },
+        ],
+      };
+    });
   }
 );
 

@@ -12,7 +12,28 @@ import { isPortInUse } from "./util";
 import * as crypto from "crypto";
 
 const WS_DEFAULT_PORT = 8089;
-const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
+const DEFAULT_TIMEOUT_MS = parseInt(
+  process.env.EXTENSION_TIMEOUT_MS ?? "5000",
+  10
+);
+
+// Per-command timeout map (ms)
+const COMMAND_TIMEOUT_MS: Record<string, number> = {
+  navigate: 30000,
+  "wait-for": 30000,
+  screenshot: 10000,
+  click: 5000,
+  type: 5000,
+  "fill-form": 5000,
+  evaluate: 5000,
+  snapshot: 5000,
+  "get-network-requests": 5000,
+  // Read-only commands use default
+};
+
+function getTimeoutForCommand(cmd: string): number {
+  return COMMAND_TIMEOUT_MS[cmd] ?? DEFAULT_TIMEOUT_MS;
+}
 
 interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
   resource: T;
@@ -224,8 +245,10 @@ export class BrowserAPI {
 
   private async waitForResponse<T extends ExtensionMessage["resource"]>(
     correlationId: string,
-    resource: T
+    resource: T,
+    timeoutMs?: number
   ): Promise<Extract<ExtensionMessage, { resource: T }>> {
+    const timeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
     return new Promise<Extract<ExtensionMessage, { resource: T }>>(
       (resolve, reject) => {
         this.extensionRequestMap.set(correlationId, {
@@ -236,7 +259,7 @@ export class BrowserAPI {
         setTimeout(() => {
           this.extensionRequestMap.delete(correlationId);
           reject("Timed out waiting for response");
-        }, EXTENSION_RESPONSE_TIMEOUT_MS);
+        }, timeout);
       }
     );
   }
