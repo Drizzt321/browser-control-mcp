@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-03-12",
+  "commit": "2dcbdbe (upstream main)",
+  "mcp_server": "~/.claude/mcp-servers/browser-control/dist/server.js (stock upstream v1.5.1)",
+  "extension": "upstream browser-control-mcp Firefox extension",
+  "tools_tested": 7,
+  "tests_passed": 7,
+  "tests_failed": 0,
+  "results": {
+    "get-list-of-open-tabs": {
+      "status": "pass",
+      "notes": "21 tabs returned, pagination (offset/limit) works correctly"
+    },
+    "open-browser-tab": {
+      "status": "pass",
+      "notes": "Opened https://example.com, returned tab id 1776"
+    },
+    "get-recent-browser-history": {
+      "status": "pass",
+      "notes": "80+ history items returned for 'example' search query"
+    },
+    "get-tab-web-content": {
+      "status": "pass",
+      "notes": "Returned page text content and 1 link for example.com"
+    },
+    "find-highlight-in-browser-tab": {
+      "status": "pass",
+      "notes": "Found 1 match for 'Example Domain' in tab 1776"
+    },
+    "group-browser-tabs": {
+      "status": "pass",
+      "notes": "Created group 'Baseline Test' with 1 tab, got group ID"
+    },
+    "close-browser-tabs": {
+      "status": "pass",
+      "notes": "Closed tab 1776 successfully"
+    },
+    "reorder-browser-tabs": {
+      "status": "pass",
+      "notes": "Reordered tabs [7,8,9] to [9,8,7], then restored to [7,8,9]. Both operations returned expected order."
+    }
+  }
+}
