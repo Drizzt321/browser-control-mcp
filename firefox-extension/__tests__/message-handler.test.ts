@@ -549,5 +549,70 @@ describe("MessageHandler", () => {
         expect(browser.find.find).not.toHaveBeenCalled();
       });
     });
+
+    describe("group-tabs command", () => {
+      it("should group tabs and send the group ID to the server", async () => {
+        // Arrange
+        const request: ServerMessageRequest = {
+          cmd: "group-tabs",
+          tabIds: [123, 456],
+          isCollapsed: false,
+          groupColor: "blue",
+          groupTitle: "Test Group",
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.group as jest.Mock).mockResolvedValue(1);
+        (browser.tabGroups.update as jest.Mock).mockResolvedValue({ id: 1 });
+
+        // Act
+        await messageHandler.handleDecodedMessage(request);
+
+        // Assert
+        expect(browser.tabs.group).toHaveBeenCalledWith({
+          tabIds: [123, 456],
+        });
+        expect(browser.tabGroups.update).toHaveBeenCalledWith(1, {
+          collapsed: false,
+          color: "blue",
+          title: "Test Group",
+        });
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "new-tab-group",
+          correlationId: "test-correlation-id",
+          groupId: 1,
+        });
+      });
+
+      it("should group tabs with collapsed state", async () => {
+        // Arrange
+        const request: ServerMessageRequest = {
+          cmd: "group-tabs",
+          tabIds: [789],
+          isCollapsed: true,
+          groupColor: "red",
+          groupTitle: "Collapsed Group",
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.group as jest.Mock).mockResolvedValue(2);
+        (browser.tabGroups.update as jest.Mock).mockResolvedValue({ id: 2 });
+
+        // Act
+        await messageHandler.handleDecodedMessage(request);
+
+        // Assert
+        expect(browser.tabGroups.update).toHaveBeenCalledWith(2, {
+          collapsed: true,
+          color: "red",
+          title: "Collapsed Group",
+        });
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "new-tab-group",
+          correlationId: "test-correlation-id",
+          groupId: 2,
+        });
+      });
+    });
   });
 });
