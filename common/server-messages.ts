@@ -46,6 +46,13 @@ export interface GroupTabsServerMessage extends ServerMessageBase {
   groupTitle: string;
 }
 
+export interface NavigateServerMessage extends ServerMessageBase {
+  cmd: "navigate";
+  url: string;
+  tabId?: number;
+  waitUntil?: "load" | "domcontentloaded";
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -54,6 +61,7 @@ export type ServerMessage =
   | GetTabContentServerMessage
   | ReorderTabsServerMessage
   | FindHighlightServerMessage
-  | GroupTabsServerMessage;
+  | GroupTabsServerMessage
+  | NavigateServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

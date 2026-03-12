@@ -11,6 +11,14 @@ const mockBrowser = {
     move: jest.fn(),
     update: jest.fn(),
     group: jest.fn(),
+    onUpdated: {
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+    },
+  },
+  scripting: {
+    executeScript: jest.fn(),
+    registerContentScripts: jest.fn(),
   },
   tabGroups: {
     update: jest.fn(),

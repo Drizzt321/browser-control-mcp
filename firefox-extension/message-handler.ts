@@ -54,6 +54,14 @@ export class MessageHandler {
           req.groupTitle
         );
         break;
+      case "navigate":
+        await this.navigateTab(
+          req.correlationId,
+          req.url,
+          req.tabId,
+          req.waitUntil
+        );
+        break;
       default:
         const _exhaustiveCheck: never = req;
         console.error("Invalid message received:", req);
@@ -66,7 +74,7 @@ export class MessageHandler {
     if ("url" in req && req.url) {
       contextUrl = req.url;
     }
-    if ("tabId" in req) {
+    if ("tabId" in req && req.tabId !== undefined) {
       try {
         const tab = await browser.tabs.get(req.tabId);
         contextUrl = tab.url;
@@ -299,6 +307,74 @@ export class MessageHandler {
       resource: "find-highlight-result",
       correlationId,
       noOfResults: findResults.count,
+    });
+  }
+
+  private async navigateTab(
+    correlationId: string,
+    url: string,
+    tabId?: number,
+    waitUntil?: "load" | "domcontentloaded"
+  ): Promise<void> {
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      throw new Error("Invalid URL: must start with http:// or https://");
+    }
+
+    if (await isDomainInDenyList(url)) {
+      throw new Error("Domain in user defined deny list");
+    }
+
+    // Resolve target tab
+    let targetTabId: number;
+    if (tabId !== undefined) {
+      targetTabId = tabId;
+    } else {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!activeTab?.id) {
+        throw new Error("No active tab found");
+      }
+      targetTabId = activeTab.id;
+    }
+
+    await this.checkForUrlPermission(url);
+
+    // Navigate and wait for load
+    await browser.tabs.update(targetTabId, { url });
+
+    // Wait for the tab to finish loading
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        browser.tabs.onUpdated.removeListener(listener);
+        reject(new Error("Navigation timed out"));
+      }, 30000);
+
+      const targetStatus =
+        waitUntil === "domcontentloaded" ? "loading" : "complete";
+
+      const listener = (
+        updatedTabId: number,
+        changeInfo: browser.tabs._OnUpdatedChangeInfo
+      ) => {
+        if (updatedTabId === targetTabId && changeInfo.status === targetStatus) {
+          clearTimeout(timeout);
+          browser.tabs.onUpdated.removeListener(listener);
+          resolve();
+        }
+      };
+      browser.tabs.onUpdated.addListener(listener);
+    });
+
+    // Get final tab info
+    const tab = await browser.tabs.get(targetTabId);
+
+    await this.client.sendResourceToServer({
+      resource: "navigate-result",
+      correlationId,
+      url: tab.url ?? url,
+      title: tab.title ?? "",
     });
   }
 

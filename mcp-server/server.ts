@@ -258,6 +258,36 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-navigate",
+  "Navigate a browser tab to a URL and wait for the page to load",
+  {
+    url: z.string().describe("URL to navigate to (must be http:// or https://)"),
+    tabId: z.number().optional().describe("Tab ID to navigate. Default: active tab"),
+    wait_until: z.enum(["load", "domcontentloaded"]).optional().default("load").describe("Wait until page load event fires"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before navigation"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after navigation completes"),
+  },
+  async ({ url, tabId, wait_until, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-navigate",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        const result = await browserApi.navigate(url, tabId, wait_until);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Navigated to ${result.url} — "${result.title}"`,
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);

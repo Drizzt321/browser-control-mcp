@@ -179,6 +179,25 @@ export class BrowserAPI {
     return message.noOfResults;
   }
 
+  async navigate(
+    url: string,
+    tabId?: number,
+    waitUntil?: "load" | "domcontentloaded"
+  ): Promise<{ url: string; title: string }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "navigate",
+      url,
+      tabId,
+      waitUntil,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "navigate-result",
+      getTimeoutForCommand("navigate")
+    );
+    return { url: message.url, title: message.title };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,

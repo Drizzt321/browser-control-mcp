@@ -584,6 +584,25 @@ describe("MessageHandler", () => {
         });
       });
 
+      it("should handle tab group errors gracefully", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "group-tabs",
+          tabIds: [999],
+          isCollapsed: false,
+          groupColor: "grey",
+          groupTitle: "Error Group",
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.group as jest.Mock).mockRejectedValue(
+          new Error("Invalid tab IDs")
+        );
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Invalid tab IDs");
+      });
+
       it("should group tabs with collapsed state", async () => {
         // Arrange
         const request: ServerMessageRequest = {
@@ -612,6 +631,88 @@ describe("MessageHandler", () => {
           correlationId: "test-correlation-id",
           groupId: 2,
         });
+      });
+    });
+
+    describe("navigate command", () => {
+      it("should navigate the active tab and send result to server", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "navigate",
+          url: "https://example.com",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockActiveTab = { id: 42, url: "https://old.com" };
+        (browser.tabs.query as jest.Mock).mockResolvedValue([mockActiveTab]);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.tabs.update as jest.Mock).mockResolvedValue(undefined);
+
+        // Simulate the onUpdated listener firing immediately
+        (browser.tabs.onUpdated.addListener as jest.Mock).mockImplementation(
+          (listener: Function) => {
+            setTimeout(() => listener(42, { status: "complete" }), 0);
+          }
+        );
+
+        const mockTab = {
+          id: 42,
+          url: "https://example.com",
+          title: "Example",
+        };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.tabs.update).toHaveBeenCalledWith(42, {
+          url: "https://example.com",
+        });
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "navigate-result",
+          correlationId: "test-correlation-id",
+          url: "https://example.com",
+          title: "Example",
+        });
+      });
+
+      it("should navigate a specific tab by tabId", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "navigate",
+          url: "https://example.com",
+          tabId: 99,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.tabs.update as jest.Mock).mockResolvedValue(undefined);
+        (browser.tabs.onUpdated.addListener as jest.Mock).mockImplementation(
+          (listener: Function) => {
+            setTimeout(() => listener(99, { status: "complete" }), 0);
+          }
+        );
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 99,
+          url: "https://example.com",
+          title: "Example",
+        });
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.tabs.update).toHaveBeenCalledWith(99, {
+          url: "https://example.com",
+        });
+        expect(browser.tabs.query).not.toHaveBeenCalled();
+      });
+
+      it("should reject invalid URLs", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "navigate",
+          url: "ftp://example.com",
+          correlationId: "test-correlation-id",
+        };
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Invalid URL");
       });
     });
   });

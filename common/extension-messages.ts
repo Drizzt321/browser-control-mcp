@@ -60,6 +60,12 @@ export interface TabGroupCreatedExtensionMessage extends ExtensionMessageBase {
   groupId: number;
 }
 
+export interface NavigateResultExtensionMessage extends ExtensionMessageBase {
+  resource: "navigate-result";
+  url: string;
+  title: string;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -68,7 +74,8 @@ export type ExtensionMessage =
   | ReorderedTabsExtensionMessage
   | FindHighlightExtensionMessage
   | TabsClosedExtensionMessage
-  | TabGroupCreatedExtensionMessage;
+  | TabGroupCreatedExtensionMessage
+  | NavigateResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;
