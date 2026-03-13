@@ -64,6 +64,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-click",
     name: "Click Element",
     description: "Allows the MCP server to click elements on web pages"
+  },
+  {
+    id: "browser-type",
+    name: "Type Text",
+    description: "Allows the MCP server to type text into input elements"
   }
 ];
 
@@ -80,6 +85,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "navigate": "browser-navigate",
   "evaluate": "browser-evaluate",
   "click": "browser-click",
+  "type": "browser-type",
 };
 
 // Storage schema for tool settings

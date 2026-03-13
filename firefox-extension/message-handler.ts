@@ -1,7 +1,7 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
 import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
-import { evaluateInPage, clickElement } from "./mutation-handler";
+import { evaluateInPage, clickElement, typeInElement } from "./mutation-handler";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -75,6 +75,16 @@ export class MessageHandler {
           req.correlationId,
           req.selector,
           req.description,
+          req.tabId
+        );
+        break;
+      case "type":
+        await this.typeText(
+          req.correlationId,
+          req.selector,
+          req.text,
+          req.clearFirst,
+          req.submit,
           req.tabId
         );
         break;
@@ -465,6 +475,45 @@ export class MessageHandler {
       correlationId,
       success,
       description,
+    });
+  }
+
+  private async typeText(
+    correlationId: string,
+    selector: string,
+    text: string,
+    clearFirst?: boolean,
+    submit?: boolean,
+    tabId?: number
+  ): Promise<void> {
+    // Resolve target tab
+    let targetTabId: number;
+    if (tabId !== undefined) {
+      targetTabId = tabId;
+    } else {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!activeTab?.id) {
+        throw new Error("No active tab found");
+      }
+      targetTabId = activeTab.id;
+    }
+
+    const tab = await browser.tabs.get(targetTabId);
+    if (tab.url && (await isDomainInDenyList(tab.url))) {
+      throw new Error("Domain in tab URL is in the deny list");
+    }
+
+    await this.checkForUrlPermission(tab.url);
+
+    const success = await typeInElement(targetTabId, selector, text, clearFirst ?? false, submit ?? false);
+
+    await this.client.sendResourceToServer({
+      resource: "type-result",
+      correlationId,
+      success,
     });
   }
 

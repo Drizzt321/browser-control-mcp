@@ -234,6 +234,29 @@ export class BrowserAPI {
     return { success: message.success };
   }
 
+  async type(
+    selector: string,
+    text: string,
+    clearFirst?: boolean,
+    submit?: boolean,
+    tabId?: number
+  ): Promise<{ success: boolean }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "type",
+      selector,
+      text,
+      clearFirst,
+      submit,
+      tabId,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "type-result",
+      getTimeoutForCommand("type")
+    );
+    return { success: message.success };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,

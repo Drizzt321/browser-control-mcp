@@ -118,3 +118,68 @@ export async function clickElement(
 
   return result ?? false;
 }
+
+/**
+ * Type text into an element identified by CSS selector.
+ * Supports input/textarea (via value assignment) and contentEditable (via textContent).
+ * Dispatches input and change events for framework compatibility.
+ */
+export async function typeInElement(
+  tabId: number,
+  selector: string,
+  text: string,
+  clearFirst: boolean,
+  submit: boolean
+): Promise<boolean> {
+  const result = await runInPage(
+    tabId,
+    (sel: string, txt: string, clear: boolean, doSubmit: boolean) => {
+      try {
+        const el = document.querySelector(sel);
+        if (!el) {
+          return { error: `Element not found: ${sel}` };
+        }
+
+        const target = el as HTMLElement;
+        target.focus();
+
+        if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+          if (clear) {
+            target.value = "";
+          }
+          target.value += txt;
+        } else if (target.isContentEditable) {
+          if (clear) {
+            target.textContent = "";
+          }
+          target.textContent = (target.textContent ?? "") + txt;
+        } else {
+          return { error: `Element "${sel}" is not an input, textarea, or contentEditable element` };
+        }
+
+        // Dispatch events for framework compatibility
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+        target.dispatchEvent(new Event("change", { bubbles: true }));
+
+        if (doSubmit) {
+          const form = target.closest("form");
+          if (form) {
+            form.requestSubmit();
+          } else {
+            // Simulate Enter keypress for non-form inputs
+            target.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
+            target.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true }));
+          }
+        }
+
+        return { ok: true, value: true };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+    [selector, text, clearFirst, submit]
+  );
+
+  return result ?? false;
+}

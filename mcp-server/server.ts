@@ -348,6 +348,38 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-type",
+  "Type text into an input element on a web page identified by CSS selector",
+  {
+    selector: z.string().describe("CSS selector for the input element"),
+    text: z.string().describe("Text to type into the element"),
+    clear_first: z.boolean().optional().describe("Clear the element before typing (default: false)"),
+    submit: z.boolean().optional().describe("Submit the form after typing (default: false)"),
+    tabId: z.number().optional().describe("Tab ID to type in. Default: active tab"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before typing"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after typing"),
+  },
+  async ({ selector, text, clear_first, submit, tabId, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-type",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        await browserApi.type(selector, text, clear_first, submit, tabId);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Typed "${text}" into "${selector}"${clear_first ? " (cleared first)" : ""}${submit ? " (submitted)" : ""}`,
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);
