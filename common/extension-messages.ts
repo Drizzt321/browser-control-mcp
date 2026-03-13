@@ -114,6 +114,19 @@ export interface WaitForResultExtensionMessage extends ExtensionMessageBase {
   elapsed_ms: number;
 }
 
+export interface NetworkRequest {
+  method: string;
+  url: string;
+  status: number;
+  duration_ms: number;
+  timestamp: number;
+}
+
+export interface NetworkRequestsResultExtensionMessage extends ExtensionMessageBase {
+  resource: "network-requests-result";
+  requests: NetworkRequest[];
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -130,7 +143,8 @@ export type ExtensionMessage =
   | ScreenshotResultExtensionMessage
   | FillFormResultExtensionMessage
   | SnapshotResultExtensionMessage
-  | WaitForResultExtensionMessage;
+  | WaitForResultExtensionMessage
+  | NetworkRequestsResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

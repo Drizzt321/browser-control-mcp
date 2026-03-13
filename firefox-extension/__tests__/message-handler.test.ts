@@ -1345,5 +1345,86 @@ describe("MessageHandler", () => {
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
+
+    describe("get-network-requests command", () => {
+      it("should return network requests from the active tab", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "get-network-requests",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockRequests = [
+          { method: "GET", url: "https://api.example.com/data", status: 200, duration_ms: 150, timestamp: 1234567890 },
+          { method: "POST", url: "https://api.example.com/submit", status: 201, duration_ms: 300, timestamp: 1234567900 },
+        ];
+
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: mockRequests } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            resource: "network-requests-result",
+            correlationId: "test-correlation-id",
+            requests: mockRequests,
+          })
+        );
+      });
+
+      it("should filter requests by URL pattern in a specific tab", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "get-network-requests",
+          tabId: 42,
+          filterUrl: "api\\.example\\.com",
+          limit: 10,
+          correlationId: "test-correlation-id",
+        };
+
+        const mockTab = { id: 42, url: "https://example.com" };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: [] } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.tabs.query).not.toHaveBeenCalled();
+        expect(browser.scripting.executeScript).toHaveBeenCalledWith(
+          expect.objectContaining({
+            target: { tabId: 42 },
+          })
+        );
+      });
+
+      it("should throw if tab domain is in deny list", async () => {
+        const configWithDenyList = {
+          secret: "test-secret",
+          domainDenyList: ["evil.com"],
+          ports: [8089],
+        };
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: configWithDenyList,
+        });
+
+        const request: ServerMessageRequest = {
+          cmd: "get-network-requests",
+          tabId: 99,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 99,
+          url: "https://evil.com",
+        });
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Domain in user defined deny list");
+        expect(browser.scripting.executeScript).not.toHaveBeenCalled();
+      });
+    });
   });
 });

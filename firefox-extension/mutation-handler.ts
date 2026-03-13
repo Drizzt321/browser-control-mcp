@@ -351,6 +351,137 @@ export async function waitForElement(
   return result ?? { found: false, elapsed_ms: timeoutMs };
 }
 
+export interface CapturedNetworkRequest {
+  method: string;
+  url: string;
+  status: number;
+  duration_ms: number;
+  timestamp: number;
+}
+
+/**
+ * Install network request interceptors (fetch + XHR) in page context and
+ * return captured requests. Interceptors are installed idempotently — safe
+ * to call multiple times. Supports URL regex filtering, timestamp filtering,
+ * and result limiting.
+ */
+export async function getNetworkRequests(
+  tabId: number,
+  filterUrl?: string,
+  sinceMs?: number,
+  limit?: number
+): Promise<CapturedNetworkRequest[]> {
+  const result = await runInPage(
+    tabId,
+    (urlFilter: string | null, since: number | null, maxResults: number) => {
+      try {
+        const BUFFER_KEY = "__bcmcp_network_requests__";
+        const INSTALLED_KEY = "__bcmcp_network_installed__";
+
+        // Initialize buffer if not present
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const win = window as any;
+        if (!win[BUFFER_KEY]) {
+          win[BUFFER_KEY] = [];
+        }
+        const buffer: Array<{ method: string; url: string; status: number; duration_ms: number; timestamp: number }> = win[BUFFER_KEY];
+
+        // Install interceptors once
+        if (!win[INSTALLED_KEY]) {
+          win[INSTALLED_KEY] = true;
+          const MAX_BUFFER = 500;
+
+          // Intercept fetch
+          const originalFetch = window.fetch;
+          window.fetch = async function (...args: Parameters<typeof fetch>) {
+            const startTime = Date.now();
+            const request = new Request(...args);
+            const method = request.method;
+            const url = request.url;
+            try {
+              const response = await originalFetch.apply(window, args);
+              buffer.push({
+                method,
+                url,
+                status: response.status,
+                duration_ms: Date.now() - startTime,
+                timestamp: startTime,
+              });
+              if (buffer.length > MAX_BUFFER) buffer.splice(0, buffer.length - MAX_BUFFER);
+              return response;
+            } catch (err) {
+              buffer.push({
+                method,
+                url,
+                status: 0,
+                duration_ms: Date.now() - startTime,
+                timestamp: startTime,
+              });
+              if (buffer.length > MAX_BUFFER) buffer.splice(0, buffer.length - MAX_BUFFER);
+              throw err;
+            }
+          };
+
+          // Intercept XMLHttpRequest
+          const originalOpen = XMLHttpRequest.prototype.open;
+          const originalSend = XMLHttpRequest.prototype.send;
+
+          XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: unknown[]) {
+            (this as any).__bcmcp_method = method;
+            (this as any).__bcmcp_url = typeof url === "string" ? url : url.toString();
+            (this as any).__bcmcp_startTime = 0;
+            return originalOpen.apply(this, [method, url, ...rest] as any);
+          };
+
+          XMLHttpRequest.prototype.send = function (...args: unknown[]) {
+            (this as any).__bcmcp_startTime = Date.now();
+            this.addEventListener("loadend", function () {
+              buffer.push({
+                method: (this as any).__bcmcp_method || "UNKNOWN",
+                url: (this as any).__bcmcp_url || "",
+                status: this.status,
+                duration_ms: Date.now() - ((this as any).__bcmcp_startTime || Date.now()),
+                timestamp: (this as any).__bcmcp_startTime || Date.now(),
+              });
+              if (buffer.length > MAX_BUFFER) buffer.splice(0, buffer.length - MAX_BUFFER);
+            });
+            return originalSend.apply(this, args as any);
+          };
+        }
+
+        // Filter and return results
+        let results = [...buffer];
+
+        if (urlFilter) {
+          try {
+            const regex = new RegExp(urlFilter);
+            results = results.filter((r) => regex.test(r.url));
+          } catch {
+            // Invalid regex — skip filtering
+          }
+        }
+
+        if (since !== null) {
+          results = results.filter((r) => r.timestamp >= since);
+        }
+
+        // Limit results (return most recent)
+        if (results.length > maxResults) {
+          results = results.slice(-maxResults);
+        }
+
+        return { ok: true, value: results };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+    [filterUrl ?? null, sinceMs ?? null, limit ?? 50]
+  );
+
+  return result ?? [];
+}
+
 export interface SnapshotElementResult {
   selector: string;
   role: string;

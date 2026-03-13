@@ -109,6 +109,14 @@ export interface WaitForServerMessage extends ServerMessageBase {
   visible?: boolean;
 }
 
+export interface GetNetworkRequestsServerMessage extends ServerMessageBase {
+  cmd: "get-network-requests";
+  tabId?: number;
+  filterUrl?: string;
+  sinceMs?: number;
+  limit?: number;
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -125,6 +133,7 @@ export type ServerMessage =
   | ScreenshotServerMessage
   | FillFormServerMessage
   | SnapshotServerMessage
-  | WaitForServerMessage;
+  | WaitForServerMessage
+  | GetNetworkRequestsServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

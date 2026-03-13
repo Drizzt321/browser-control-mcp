@@ -335,6 +335,27 @@ export class BrowserAPI {
     return { found: message.found, elapsed_ms: message.elapsed_ms };
   }
 
+  async getNetworkRequests(
+    tabId?: number,
+    filterUrl?: string,
+    sinceMs?: number,
+    limit?: number
+  ): Promise<{ requests: Array<{ method: string; url: string; status: number; duration_ms: number; timestamp: number }> }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "get-network-requests",
+      tabId,
+      filterUrl,
+      sinceMs,
+      limit,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "network-requests-result",
+      getTimeoutForCommand("get-network-requests")
+    );
+    return { requests: message.requests };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,

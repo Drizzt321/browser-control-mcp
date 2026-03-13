@@ -1,7 +1,7 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
 import { isCommandAllowed, isDomainInDenyList, isDomainAllowed, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
-import { evaluateInPage, clickElement, typeInElement, fillForm, getSnapshot, waitForElement } from "./mutation-handler";
+import { evaluateInPage, clickElement, typeInElement, fillForm, getSnapshot, waitForElement, getNetworkRequests } from "./mutation-handler";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -119,6 +119,15 @@ export class MessageHandler {
           req.tabId,
           req.timeoutMs,
           req.visible
+        );
+        break;
+      case "get-network-requests":
+        await this.getNetworkRequestsHandler(
+          req.correlationId,
+          req.tabId,
+          req.filterUrl,
+          req.sinceMs,
+          req.limit
         );
         break;
       default:
@@ -746,6 +755,49 @@ export class MessageHandler {
       correlationId,
       found: result.found,
       elapsed_ms: result.elapsed_ms,
+    });
+  }
+
+  private async getNetworkRequestsHandler(
+    correlationId: string,
+    tabId?: number,
+    filterUrl?: string,
+    sinceMs?: number,
+    limit?: number
+  ): Promise<void> {
+    // Resolve target tab
+    let targetTabId: number;
+    if (tabId !== undefined) {
+      targetTabId = tabId;
+    } else {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!activeTab?.id) {
+        throw new Error("No active tab found");
+      }
+      targetTabId = activeTab.id;
+    }
+
+    const tab = await browser.tabs.get(targetTabId);
+    if (tab.url) {
+      await this.checkDomainAccess(tab.url);
+    }
+
+    await this.checkForUrlPermission(tab.url);
+
+    const requests = await getNetworkRequests(
+      targetTabId,
+      filterUrl,
+      sinceMs,
+      limit
+    );
+
+    await this.client.sendResourceToServer({
+      resource: "network-requests-result",
+      correlationId,
+      requests,
     });
   }
 
