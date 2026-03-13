@@ -800,5 +800,93 @@ describe("MessageHandler", () => {
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
+
+    describe("click command", () => {
+      it("should click element in the active tab", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "click",
+          selector: "button.submit",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockActiveTab = { id: 42, url: "https://example.com" };
+        (browser.tabs.query as jest.Mock).mockResolvedValue([mockActiveTab]);
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockActiveTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: true } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.scripting.executeScript).toHaveBeenCalled();
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "click-result",
+          correlationId: "test-correlation-id",
+          success: true,
+          description: undefined,
+        });
+      });
+
+      it("should click element in a specific tab by tabId", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "click",
+          selector: "#my-button",
+          description: "Submit button",
+          tabId: 99,
+          correlationId: "test-correlation-id",
+        };
+
+        const mockTab = { id: 99, url: "https://example.com" };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: true } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.tabs.query).not.toHaveBeenCalled();
+        expect(browser.scripting.executeScript).toHaveBeenCalled();
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "click-result",
+          correlationId: "test-correlation-id",
+          success: true,
+          description: "Submit button",
+        });
+      });
+
+      it("should throw if tab domain is in deny list", async () => {
+        const configWithDenyList: ExtensionConfig = {
+          secret: "test-secret",
+          toolSettings: {
+            "browser-click": true,
+          },
+          domainDenyList: ["evil.com"],
+          ports: [8089],
+          auditLog: [],
+        };
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: configWithDenyList,
+        });
+
+        const request: ServerMessageRequest = {
+          cmd: "click",
+          selector: "a.link",
+          tabId: 99,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 99,
+          url: "https://evil.com",
+        });
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        expect(browser.scripting.executeScript).not.toHaveBeenCalled();
+      });
+    });
   });
 });

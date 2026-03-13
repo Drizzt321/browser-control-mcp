@@ -59,6 +59,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-evaluate",
     name: "Evaluate JavaScript",
     description: "Allows the MCP server to execute JavaScript in page context"
+  },
+  {
+    id: "browser-click",
+    name: "Click Element",
+    description: "Allows the MCP server to click elements on web pages"
   }
 ];
 
@@ -74,6 +79,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "group-tabs": "reorder-browser-tabs",
   "navigate": "browser-navigate",
   "evaluate": "browser-evaluate",
+  "click": "browser-click",
 };
 
 // Storage schema for tool settings

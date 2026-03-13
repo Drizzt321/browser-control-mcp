@@ -77,3 +77,44 @@ export async function evaluateInPage(
 
   return result ?? "undefined";
 }
+
+/**
+ * Click an element identified by CSS selector.
+ * Uses synthetic event dispatch (focus → mousedown → mouseup → click) for
+ * framework compatibility (React, Vue, etc. rely on the full event sequence).
+ */
+export async function clickElement(
+  tabId: number,
+  selector: string
+): Promise<boolean> {
+  const result = await runInPage(
+    tabId,
+    (sel: string) => {
+      try {
+        const el = document.querySelector(sel);
+        if (!el) {
+          return { error: `Element not found: ${sel}` };
+        }
+
+        const target = el as HTMLElement;
+
+        // Scroll into view if needed
+        target.scrollIntoView({ block: "center", behavior: "instant" });
+
+        // Synthetic event sequence for framework compatibility
+        target.focus();
+        target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+        target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+        target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+        return { ok: true, value: true };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+    [selector]
+  );
+
+  return result ?? false;
+}

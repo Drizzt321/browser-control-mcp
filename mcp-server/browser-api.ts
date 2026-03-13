@@ -215,6 +215,25 @@ export class BrowserAPI {
     return { result: message.result };
   }
 
+  async click(
+    selector: string,
+    description?: string,
+    tabId?: number
+  ): Promise<{ success: boolean }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "click",
+      selector,
+      description,
+      tabId,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "click-result",
+      getTimeoutForCommand("click")
+    );
+    return { success: message.success };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,

@@ -317,6 +317,37 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-click",
+  "Click an element on a web page identified by CSS selector",
+  {
+    selector: z.string().describe("CSS selector for the element to click"),
+    description: z.string().optional().describe("Human-readable label for the element (for logging)"),
+    tabId: z.number().optional().describe("Tab ID to click in. Default: active tab"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before clicking"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after clicking"),
+  },
+  async ({ selector, description, tabId, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-click",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        const result = await browserApi.click(selector, description, tabId);
+        const label = description ? ` (${description})` : "";
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Clicked element "${selector}"${label}`,
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);

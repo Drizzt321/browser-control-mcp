@@ -71,6 +71,12 @@ export interface EvaluateResultExtensionMessage extends ExtensionMessageBase {
   result: string;
 }
 
+export interface ClickResultExtensionMessage extends ExtensionMessageBase {
+  resource: "click-result";
+  success: boolean;
+  description?: string;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -81,7 +87,8 @@ export type ExtensionMessage =
   | TabsClosedExtensionMessage
   | TabGroupCreatedExtensionMessage
   | NavigateResultExtensionMessage
-  | EvaluateResultExtensionMessage;
+  | EvaluateResultExtensionMessage
+  | ClickResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

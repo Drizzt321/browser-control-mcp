@@ -59,6 +59,13 @@ export interface EvaluateServerMessage extends ServerMessageBase {
   tabId?: number;
 }
 
+export interface ClickServerMessage extends ServerMessageBase {
+  cmd: "click";
+  selector: string;
+  description?: string;
+  tabId?: number;
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -69,6 +76,7 @@ export type ServerMessage =
   | FindHighlightServerMessage
   | GroupTabsServerMessage
   | NavigateServerMessage
-  | EvaluateServerMessage;
+  | EvaluateServerMessage
+  | ClickServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

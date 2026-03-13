@@ -1,7 +1,7 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
 import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
-import { evaluateInPage } from "./mutation-handler";
+import { evaluateInPage, clickElement } from "./mutation-handler";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -67,6 +67,14 @@ export class MessageHandler {
         await this.evaluateScript(
           req.correlationId,
           req.script,
+          req.tabId
+        );
+        break;
+      case "click":
+        await this.clickElement(
+          req.correlationId,
+          req.selector,
+          req.description,
           req.tabId
         );
         break;
@@ -419,6 +427,44 @@ export class MessageHandler {
       resource: "evaluate-result",
       correlationId,
       result,
+    });
+  }
+
+  private async clickElement(
+    correlationId: string,
+    selector: string,
+    description?: string,
+    tabId?: number
+  ): Promise<void> {
+    // Resolve target tab
+    let targetTabId: number;
+    if (tabId !== undefined) {
+      targetTabId = tabId;
+    } else {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!activeTab?.id) {
+        throw new Error("No active tab found");
+      }
+      targetTabId = activeTab.id;
+    }
+
+    const tab = await browser.tabs.get(targetTabId);
+    if (tab.url && (await isDomainInDenyList(tab.url))) {
+      throw new Error("Domain in tab URL is in the deny list");
+    }
+
+    await this.checkForUrlPermission(tab.url);
+
+    const success = await clickElement(targetTabId, selector);
+
+    await this.client.sendResourceToServer({
+      resource: "click-result",
+      correlationId,
+      success,
+      description,
     });
   }
 
