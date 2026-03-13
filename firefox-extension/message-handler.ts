@@ -1,6 +1,6 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
-import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
+import { isCommandAllowed, isDomainInDenyList, isDomainAllowed, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
 import { evaluateInPage, clickElement, typeInElement } from "./mutation-handler";
 
 export class MessageHandler {
@@ -128,15 +128,26 @@ export class MessageHandler {
     await addAuditLogEntry(auditEntry);
   }
 
+  /**
+   * Checks both allow list and deny list for a URL.
+   * Throws if the domain is blocked by either list.
+   */
+  private async checkDomainAccess(url: string): Promise<void> {
+    if (!(await isDomainAllowed(url))) {
+      throw new Error("Domain not in allow list");
+    }
+    if (await isDomainInDenyList(url)) {
+      throw new Error("Domain in user defined deny list");
+    }
+  }
+
   private async openUrl(correlationId: string, url: string): Promise<void> {
     if (!url.startsWith("https://")) {
       console.error("Invalid URL:", url);
       throw new Error("Invalid URL");
     }
 
-    if (await isDomainInDenyList(url)) {
-      throw new Error("Domain in user defined deny list");
-    }
+    await this.checkDomainAccess(url);
 
     const tab = await browser.tabs.create({
       url,
@@ -240,8 +251,8 @@ export class MessageHandler {
     offset?: number
   ): Promise<void> {
     const tab = await browser.tabs.get(tabId);
-    if (tab.url && (await isDomainInDenyList(tab.url))) {
-      throw new Error(`Domain in tab URL is in the deny list`);
+    if (tab.url) {
+      await this.checkDomainAccess(tab.url);
     }
 
     await this.checkForUrlPermission(tab.url);
@@ -316,8 +327,8 @@ export class MessageHandler {
   ): Promise<void> {
     const tab = await browser.tabs.get(tabId);
 
-    if (tab.url && (await isDomainInDenyList(tab.url))) {
-      throw new Error(`Domain in tab URL is in the deny list`);
+    if (tab.url) {
+      await this.checkDomainAccess(tab.url);
     }
 
     await this.checkForGlobalPermission(["find"]);
@@ -354,9 +365,7 @@ export class MessageHandler {
       throw new Error("Invalid URL: must start with http:// or https://");
     }
 
-    if (await isDomainInDenyList(url)) {
-      throw new Error("Domain in user defined deny list");
-    }
+    await this.checkDomainAccess(url);
 
     // Resolve target tab
     let targetTabId: number;
@@ -433,8 +442,8 @@ export class MessageHandler {
     }
 
     const tab = await browser.tabs.get(targetTabId);
-    if (tab.url && (await isDomainInDenyList(tab.url))) {
-      throw new Error("Domain in tab URL is in the deny list");
+    if (tab.url) {
+      await this.checkDomainAccess(tab.url);
     }
 
     await this.checkForUrlPermission(tab.url);
@@ -470,8 +479,8 @@ export class MessageHandler {
     }
 
     const tab = await browser.tabs.get(targetTabId);
-    if (tab.url && (await isDomainInDenyList(tab.url))) {
-      throw new Error("Domain in tab URL is in the deny list");
+    if (tab.url) {
+      await this.checkDomainAccess(tab.url);
     }
 
     await this.checkForUrlPermission(tab.url);
@@ -510,8 +519,8 @@ export class MessageHandler {
     }
 
     const tab = await browser.tabs.get(targetTabId);
-    if (tab.url && (await isDomainInDenyList(tab.url))) {
-      throw new Error("Domain in tab URL is in the deny list");
+    if (tab.url) {
+      await this.checkDomainAccess(tab.url);
     }
 
     await this.checkForUrlPermission(tab.url);
@@ -547,8 +556,8 @@ export class MessageHandler {
     }
 
     const tab = await browser.tabs.get(targetTabId);
-    if (tab.url && (await isDomainInDenyList(tab.url))) {
-      throw new Error("Domain in tab URL is in the deny list");
+    if (tab.url) {
+      await this.checkDomainAccess(tab.url);
     }
 
     await this.checkForUrlPermission(tab.url);
@@ -561,10 +570,28 @@ export class MessageHandler {
       options.quality = quality;
     }
 
-    // Use Firefox-specific captureTab API which takes a tabId directly
-    // (no need to activate the tab first, unlike captureVisibleTab)
+    // Try captureTab (Firefox-specific, takes tabId directly) then captureVisibleTab
+    // Both require <all_urls> permission granted via optional_permissions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dataUrl = await (browser.tabs as any).captureTab(targetTabId, options);
+    const tabs = browser.tabs as any;
+    let dataUrl: string;
+    if (typeof tabs.captureTab === "function") {
+      dataUrl = await tabs.captureTab(targetTabId, options);
+    } else if (typeof tabs.captureVisibleTab === "function") {
+      await browser.tabs.update(targetTabId, { active: true });
+      dataUrl = await tabs.captureVisibleTab(tab.windowId!, options);
+    } else {
+      // APIs not available — open options page to request <all_urls> permission from user
+      const optionsUrl = browser.runtime.getURL(
+        "options.html?requestPermissions=" +
+        encodeURIComponent(JSON.stringify(["<all_urls>"]))
+      );
+      await browser.tabs.create({ url: optionsUrl });
+      throw new Error(
+        'Screenshot requires the "<all_urls>" permission. ' +
+        "A permission grant dialog has been opened — please approve it, then retry."
+      );
+    }
 
     await this.client.sendResourceToServer({
       resource: "screenshot-result",

@@ -416,7 +416,7 @@ describe("MessageHandler", () => {
         // Act & Assert
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.tabs.executeScript).not.toHaveBeenCalled();
       });
 
@@ -796,7 +796,7 @@ describe("MessageHandler", () => {
 
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
@@ -884,7 +884,7 @@ describe("MessageHandler", () => {
 
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
@@ -974,7 +974,7 @@ describe("MessageHandler", () => {
 
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
@@ -1066,7 +1066,7 @@ describe("MessageHandler", () => {
 
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.tabs.captureTab).not.toHaveBeenCalled();
       });
     });
