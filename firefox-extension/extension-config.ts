@@ -79,6 +79,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-fill-form",
     name: "Fill Form",
     description: "Allows the MCP server to fill multiple form fields at once"
+  },
+  {
+    id: "browser-snapshot",
+    name: "Page Snapshot",
+    description: "Allows the MCP server to get an inventory of interactive elements on the page"
   }
 ];
 
@@ -98,6 +103,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "type": "browser-type",
   "screenshot": "browser-screenshot",
   "fill-form": "browser-fill-form",
+  "snapshot": "browser-snapshot",
 };
 
 // Storage schema for tool settings

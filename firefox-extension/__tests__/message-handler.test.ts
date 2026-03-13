@@ -1151,5 +1151,84 @@ describe("MessageHandler", () => {
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
+
+    describe("snapshot command", () => {
+      it("should return interactive elements from the active tab", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "snapshot",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockElements = [
+          { selector: "#login-btn", role: "button", name: "Login", tag: "button" },
+          { selector: "a.nav-link", role: "a", name: "Home", tag: "a", href: "https://example.com/" },
+        ];
+
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: mockElements } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            resource: "snapshot-result",
+            correlationId: "test-correlation-id",
+            elements: mockElements,
+          })
+        );
+      });
+
+      it("should snapshot a specific tab by tabId", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "snapshot",
+          tabId: 42,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 42,
+          url: "https://example.com",
+        });
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: [] } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.scripting.executeScript).toHaveBeenCalledWith(
+          expect.objectContaining({
+            target: { tabId: 42 },
+          })
+        );
+      });
+
+      it("should throw if tab domain is in deny list", async () => {
+        const configWithDenyList = {
+          secret: "test-secret",
+          domainDenyList: ["evil.com"],
+          ports: [8089],
+        };
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: configWithDenyList,
+        });
+
+        const request: ServerMessageRequest = {
+          cmd: "snapshot",
+          tabId: 99,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 99,
+          url: "https://evil.com",
+        });
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Domain in user defined deny list");
+        expect(browser.scripting.executeScript).not.toHaveBeenCalled();
+      });
+    });
   });
 });

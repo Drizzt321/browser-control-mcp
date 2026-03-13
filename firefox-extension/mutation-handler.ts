@@ -275,3 +275,153 @@ export async function fillForm(
 
   return result ?? { filled: 0, errors: ["fillForm returned no result"] };
 }
+
+export interface SnapshotElementResult {
+  selector: string;
+  role: string;
+  name: string;
+  tag: string;
+  type?: string;
+  href?: string;
+}
+
+/**
+ * Get an inventory of interactive elements on the page with computed CSS selectors.
+ * Helps agents discover what's clickable/fillable without guessing selectors.
+ */
+export async function getSnapshot(
+  tabId: number,
+  maxElements: number,
+  includeNonInteractive: boolean
+): Promise<SnapshotElementResult[]> {
+  const result = await runInPage(
+    tabId,
+    (max: number, includeNonInt: boolean) => {
+      try {
+        // Selectors for interactive elements
+        const interactiveSelector = "a[href], button, input, textarea, select, [role=\"button\"], [role=\"link\"], [role=\"tab\"], [role=\"menuitem\"], [tabindex]";
+        // Additional selectors for non-interactive elements
+        const nonInteractiveSelector = "h1, h2, h3, h4, h5, h6, img[alt], [role=\"heading\"]";
+
+        const selector = includeNonInt
+          ? `${interactiveSelector}, ${nonInteractiveSelector}`
+          : interactiveSelector;
+
+        const allElements = document.querySelectorAll(selector);
+        const elements: Array<{
+          selector: string;
+          role: string;
+          name: string;
+          tag: string;
+          type?: string;
+          href?: string;
+        }> = [];
+
+        function computeSelector(el: Element): string {
+          // Prefer ID
+          if (el.id) {
+            return `#${CSS.escape(el.id)}`;
+          }
+
+          // Try unique class combination
+          if (el.classList.length > 0) {
+            const classSelector = `${el.tagName.toLowerCase()}.${Array.from(el.classList).map(c => CSS.escape(c)).join(".")}`;
+            if (document.querySelectorAll(classSelector).length === 1) {
+              return classSelector;
+            }
+          }
+
+          // Fall back to nth-of-type path
+          const parts: string[] = [];
+          let current: Element | null = el;
+          while (current && current !== document.body && parts.length < 4) {
+            const parent: Element | null = current.parentElement;
+            if (!parent) break;
+            const currentTag = current.tagName;
+            const siblings = Array.from(parent.children).filter(
+              (c: Element) => c.tagName === currentTag
+            );
+            const tag = current.tagName.toLowerCase();
+            if (siblings.length === 1) {
+              parts.unshift(tag);
+            } else {
+              const index = siblings.indexOf(current) + 1;
+              parts.unshift(`${tag}:nth-of-type(${index})`);
+            }
+            current = parent;
+          }
+          return parts.join(" > ");
+        }
+
+        function getAccessibleName(el: Element): string {
+          // aria-label takes priority
+          const ariaLabel = el.getAttribute("aria-label");
+          if (ariaLabel) return ariaLabel;
+
+          // aria-labelledby
+          const labelledBy = el.getAttribute("aria-labelledby");
+          if (labelledBy) {
+            const labelEl = document.getElementById(labelledBy);
+            if (labelEl) return labelEl.textContent?.trim() ?? "";
+          }
+
+          // For inputs, check associated label
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+            if (el.id) {
+              const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+              if (label) return label.textContent?.trim() ?? "";
+            }
+            if ((el as HTMLInputElement | HTMLTextAreaElement).placeholder) {
+              return (el as HTMLInputElement | HTMLTextAreaElement).placeholder;
+            }
+          }
+
+          // For images, use alt text
+          if (el instanceof HTMLImageElement) {
+            return el.alt || "";
+          }
+
+          // For links/buttons, use text content
+          const text = el.textContent?.trim() ?? "";
+          return text.length > 80 ? text.substring(0, 80) + "..." : text;
+        }
+
+        for (const el of allElements) {
+          if (elements.length >= max) break;
+
+          // Skip hidden elements
+          const style = window.getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden") continue;
+
+          const htmlEl = el as HTMLElement;
+          if (htmlEl.offsetWidth === 0 && htmlEl.offsetHeight === 0) continue;
+
+          const tag = el.tagName.toLowerCase();
+          const entry: typeof elements[0] = {
+            selector: computeSelector(el),
+            role: el.getAttribute("role") || tag,
+            name: getAccessibleName(el),
+            tag,
+          };
+
+          if (el instanceof HTMLInputElement) {
+            entry.type = el.type;
+          }
+          if (el instanceof HTMLAnchorElement && el.href) {
+            entry.href = el.href;
+          }
+
+          elements.push(entry);
+        }
+
+        return { ok: true, value: elements };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+    [maxElements, includeNonInteractive]
+  );
+
+  return result ?? [];
+}

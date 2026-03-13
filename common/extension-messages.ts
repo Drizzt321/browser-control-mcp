@@ -94,6 +94,20 @@ export interface FillFormResultExtensionMessage extends ExtensionMessageBase {
   errors: string[];
 }
 
+export interface SnapshotElement {
+  selector: string;
+  role: string;
+  name: string;
+  tag: string;
+  type?: string;
+  href?: string;
+}
+
+export interface SnapshotResultExtensionMessage extends ExtensionMessageBase {
+  resource: "snapshot-result";
+  elements: SnapshotElement[];
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -108,7 +122,8 @@ export type ExtensionMessage =
   | ClickResultExtensionMessage
   | TypeResultExtensionMessage
   | ScreenshotResultExtensionMessage
-  | FillFormResultExtensionMessage;
+  | FillFormResultExtensionMessage
+  | SnapshotResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;
