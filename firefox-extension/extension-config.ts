@@ -54,6 +54,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-navigate",
     name: "Navigate Browser Tab",
     description: "Allows the MCP server to navigate a tab to a URL"
+  },
+  {
+    id: "browser-evaluate",
+    name: "Evaluate JavaScript",
+    description: "Allows the MCP server to execute JavaScript in page context"
   }
 ];
 
@@ -68,6 +73,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "find-highlight": "find-highlight-in-browser-tab",
   "group-tabs": "reorder-browser-tabs",
   "navigate": "browser-navigate",
+  "evaluate": "browser-evaluate",
 };
 
 // Storage schema for tool settings

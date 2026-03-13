@@ -53,6 +53,12 @@ export interface NavigateServerMessage extends ServerMessageBase {
   waitUntil?: "load" | "domcontentloaded";
 }
 
+export interface EvaluateServerMessage extends ServerMessageBase {
+  cmd: "evaluate";
+  script: string;
+  tabId?: number;
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -62,6 +68,7 @@ export type ServerMessage =
   | ReorderTabsServerMessage
   | FindHighlightServerMessage
   | GroupTabsServerMessage
-  | NavigateServerMessage;
+  | NavigateServerMessage
+  | EvaluateServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

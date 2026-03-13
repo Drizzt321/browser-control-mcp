@@ -1,6 +1,7 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
 import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
+import { evaluateInPage } from "./mutation-handler";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -60,6 +61,13 @@ export class MessageHandler {
           req.url,
           req.tabId,
           req.waitUntil
+        );
+        break;
+      case "evaluate":
+        await this.evaluateScript(
+          req.correlationId,
+          req.script,
+          req.tabId
         );
         break;
       default:
@@ -375,6 +383,42 @@ export class MessageHandler {
       correlationId,
       url: tab.url ?? url,
       title: tab.title ?? "",
+    });
+  }
+
+  private async evaluateScript(
+    correlationId: string,
+    script: string,
+    tabId?: number
+  ): Promise<void> {
+    // Resolve target tab
+    let targetTabId: number;
+    if (tabId !== undefined) {
+      targetTabId = tabId;
+    } else {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!activeTab?.id) {
+        throw new Error("No active tab found");
+      }
+      targetTabId = activeTab.id;
+    }
+
+    const tab = await browser.tabs.get(targetTabId);
+    if (tab.url && (await isDomainInDenyList(tab.url))) {
+      throw new Error("Domain in tab URL is in the deny list");
+    }
+
+    await this.checkForUrlPermission(tab.url);
+
+    const result = await evaluateInPage(targetTabId, script);
+
+    await this.client.sendResourceToServer({
+      resource: "evaluate-result",
+      correlationId,
+      result,
     });
   }
 

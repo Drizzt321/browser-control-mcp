@@ -288,6 +288,35 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-evaluate",
+  "Execute JavaScript in the context of a browser tab and return the result",
+  {
+    script: z.string().describe("JavaScript code to evaluate in the page context. Use 'return <value>' to return a result."),
+    tabId: z.number().optional().describe("Tab ID to evaluate in. Default: active tab"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before evaluation"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after evaluation completes"),
+  },
+  async ({ script, tabId, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-evaluate",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        const result = await browserApi.evaluate(script, tabId);
+        return {
+          content: [
+            {
+              type: "text",
+              text: result.result,
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);

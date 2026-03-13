@@ -66,6 +66,11 @@ export interface NavigateResultExtensionMessage extends ExtensionMessageBase {
   title: string;
 }
 
+export interface EvaluateResultExtensionMessage extends ExtensionMessageBase {
+  resource: "evaluate-result";
+  result: string;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -75,7 +80,8 @@ export type ExtensionMessage =
   | FindHighlightExtensionMessage
   | TabsClosedExtensionMessage
   | TabGroupCreatedExtensionMessage
-  | NavigateResultExtensionMessage;
+  | NavigateResultExtensionMessage
+  | EvaluateResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

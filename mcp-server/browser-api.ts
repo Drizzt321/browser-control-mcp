@@ -198,6 +198,23 @@ export class BrowserAPI {
     return { url: message.url, title: message.title };
   }
 
+  async evaluate(
+    script: string,
+    tabId?: number
+  ): Promise<{ result: string }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "evaluate",
+      script,
+      tabId,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "evaluate-result",
+      getTimeoutForCommand("evaluate")
+    );
+    return { result: message.result };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,
