@@ -89,6 +89,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-wait-for",
     name: "Wait For Element",
     description: "Allows the MCP server to wait for an element to appear in the DOM"
+  },
+  {
+    id: "browser-network-requests",
+    name: "Get Network Requests",
+    description: "Allows the MCP server to capture and retrieve network requests made by the page"
   }
 ];
 
@@ -110,6 +115,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "fill-form": "browser-fill-form",
   "snapshot": "browser-snapshot",
   "wait-for": "browser-wait-for",
+  "get-network-requests": "browser-network-requests",
 };
 
 // Storage schema for tool settings

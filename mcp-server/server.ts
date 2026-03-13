@@ -520,6 +520,50 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-network-requests",
+  "Get network requests (fetch/XHR) captured from a browser tab. Call once to install interceptors, then again to retrieve captured requests.",
+  {
+    tabId: z.number().optional().describe("Tab ID to monitor. Default: active tab"),
+    filter_url: z.string().optional().describe("Regex pattern to filter request URLs"),
+    since_ms: z.number().optional().describe("Only return requests after this Unix timestamp (ms)"),
+    limit: z.number().int().min(1).max(200).optional().describe("Maximum requests to return (default: 50, max: 200)"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before retrieving"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after retrieving"),
+  },
+  async ({ tabId, filter_url, since_ms, limit, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-network-requests",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        const result = await browserApi.getNetworkRequests(tabId, filter_url, since_ms, limit);
+        if (result.requests.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "No network requests captured. Note: interceptors are installed on first call — make subsequent calls to retrieve requests made after installation.",
+              },
+            ],
+          };
+        }
+        const lines = result.requests.map((r) =>
+          `[${r.method}] ${r.url} → ${r.status} (${r.duration_ms}ms)`
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Captured ${result.requests.length} request(s):\n${lines.join("\n")}`,
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);
