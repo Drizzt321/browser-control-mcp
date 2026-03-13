@@ -75,6 +75,13 @@ export interface TypeServerMessage extends ServerMessageBase {
   tabId?: number;
 }
 
+export interface ScreenshotServerMessage extends ServerMessageBase {
+  cmd: "screenshot";
+  tabId?: number;
+  format?: "png" | "jpeg";
+  quality?: number;
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -87,6 +94,7 @@ export type ServerMessage =
   | NavigateServerMessage
   | EvaluateServerMessage
   | ClickServerMessage
-  | TypeServerMessage;
+  | TypeServerMessage
+  | ScreenshotServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

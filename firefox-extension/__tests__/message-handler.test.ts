@@ -416,7 +416,7 @@ describe("MessageHandler", () => {
         // Act & Assert
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.tabs.executeScript).not.toHaveBeenCalled();
       });
 
@@ -796,7 +796,7 @@ describe("MessageHandler", () => {
 
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
@@ -884,7 +884,7 @@ describe("MessageHandler", () => {
 
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
@@ -974,8 +974,100 @@ describe("MessageHandler", () => {
 
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        ).rejects.toThrow("Domain in user defined deny list");
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("screenshot command", () => {
+      it("should take screenshot of active tab", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "screenshot",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockActiveTab = { id: 42, url: "https://example.com", windowId: 1 };
+        (browser.tabs.query as jest.Mock).mockResolvedValue([mockActiveTab]);
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockActiveTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.tabs.captureTab as jest.Mock).mockResolvedValue(
+          "data:image/png;base64,iVBORw0KGgo="
+        );
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.tabs.captureTab).toHaveBeenCalledWith(42, {
+          format: "png",
+        });
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "screenshot-result",
+          correlationId: "test-correlation-id",
+          dataUrl: "data:image/png;base64,iVBORw0KGgo=",
+          mimeType: "image/png",
+        });
+      });
+
+      it("should take jpeg screenshot of specific tab", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "screenshot",
+          tabId: 99,
+          format: "jpeg",
+          quality: 80,
+          correlationId: "test-correlation-id",
+        };
+
+        const mockTab = { id: 99, url: "https://example.com", windowId: 2 };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.tabs.captureTab as jest.Mock).mockResolvedValue(
+          "data:image/jpeg;base64,/9j/4AAQ="
+        );
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.tabs.query).not.toHaveBeenCalled();
+        expect(browser.tabs.captureTab).toHaveBeenCalledWith(99, {
+          format: "jpeg",
+          quality: 80,
+        });
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "screenshot-result",
+          correlationId: "test-correlation-id",
+          dataUrl: "data:image/jpeg;base64,/9j/4AAQ=",
+          mimeType: "image/jpeg",
+        });
+      });
+
+      it("should throw if tab domain is in deny list", async () => {
+        const configWithDenyList: ExtensionConfig = {
+          secret: "test-secret",
+          toolSettings: {
+            "browser-screenshot": true,
+          },
+          domainDenyList: ["evil.com"],
+          ports: [8089],
+          auditLog: [],
+        };
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: configWithDenyList,
+        });
+
+        const request: ServerMessageRequest = {
+          cmd: "screenshot",
+          tabId: 99,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 99,
+          url: "https://evil.com",
+          windowId: 1,
+        });
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Domain in user defined deny list");
+        expect(browser.tabs.captureTab).not.toHaveBeenCalled();
       });
     });
   });

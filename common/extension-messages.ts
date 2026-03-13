@@ -82,6 +82,12 @@ export interface TypeResultExtensionMessage extends ExtensionMessageBase {
   success: boolean;
 }
 
+export interface ScreenshotResultExtensionMessage extends ExtensionMessageBase {
+  resource: "screenshot-result";
+  dataUrl: string;
+  mimeType: string;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -94,7 +100,8 @@ export type ExtensionMessage =
   | NavigateResultExtensionMessage
   | EvaluateResultExtensionMessage
   | ClickResultExtensionMessage
-  | TypeResultExtensionMessage;
+  | TypeResultExtensionMessage
+  | ScreenshotResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

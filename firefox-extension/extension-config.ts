@@ -69,6 +69,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-type",
     name: "Type Text",
     description: "Allows the MCP server to type text into input elements"
+  },
+  {
+    id: "browser-screenshot",
+    name: "Take Screenshot",
+    description: "Allows the MCP server to capture screenshots of web pages"
   }
 ];
 
@@ -86,6 +91,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "evaluate": "browser-evaluate",
   "click": "browser-click",
   "type": "browser-type",
+  "screenshot": "browser-screenshot",
 };
 
 // Storage schema for tool settings
@@ -106,6 +112,7 @@ export interface ExtensionConfig {
   secret: string;
   toolSettings?: ToolSettings;
   domainDenyList?: string[];
+  domainAllowList?: string[];
   ports: number[];
   auditLog?: AuditLogEntry[];
 }
@@ -265,6 +272,54 @@ export async function isDomainInDenyList(url: string): Promise<boolean> {
   } catch (error) {
     console.error(`Error checking domain in deny list: ${error}`);
     // If there's an error parsing the URL, return false
+    return false;
+  }
+}
+
+/**
+ * Gets the domain allow list
+ * @returns A Promise that resolves with the domain allow list
+ */
+export async function getDomainAllowList(): Promise<string[]> {
+  const config = await getConfig();
+  return config.domainAllowList || [];
+}
+
+/**
+ * Sets the domain allow list
+ * @param domains Array of domains to allow
+ * @returns A Promise that resolves when the setting is saved
+ */
+export async function setDomainAllowList(domains: string[]): Promise<void> {
+  const config = await getConfig();
+  config.domainAllowList = domains;
+  await saveConfig(config);
+}
+
+/**
+ * Checks if a domain is in the allow list (when allow list is non-empty).
+ * Returns true if the domain is allowed (either allow list is empty, or domain matches).
+ * @param url The URL to check
+ * @returns A Promise that resolves with true if the domain is allowed
+ */
+export async function isDomainAllowed(url: string): Promise<boolean> {
+  try {
+    const allowList = await getDomainAllowList();
+
+    // If allow list is empty, all domains are allowed (deny list still applies separately)
+    if (allowList.length === 0) {
+      return true;
+    }
+
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname;
+
+    return allowList.some(allowedDomain =>
+      domain.toLowerCase() === allowedDomain.toLowerCase() ||
+      domain.toLowerCase().endsWith(`.${allowedDomain.toLowerCase()}`)
+    );
+  } catch (error) {
+    console.error(`Error checking domain in allow list: ${error}`);
     return false;
   }
 }

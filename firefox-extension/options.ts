@@ -8,6 +8,8 @@ import {
   setToolEnabled,
   getDomainDenyList,
   setDomainDenyList,
+  getDomainAllowList,
+  setDomainAllowList,
   getPorts,
   setPorts,
   getAuditLog,
@@ -25,6 +27,9 @@ const toolSettingsContainer = document.getElementById(
 ) as HTMLDivElement;
 const domainDenyListTextarea = document.getElementById(
   "domain-deny-list"
+) as HTMLTextAreaElement;
+const domainAllowListTextarea = document.getElementById(
+  "domain-allow-list"
 ) as HTMLTextAreaElement;
 const saveDomainListsButton = document.getElementById(
   "save-domain-lists"
@@ -184,6 +189,10 @@ async function loadDomainLists() {
     // Load deny list
     const denyList = await getDomainDenyList();
     domainDenyListTextarea.value = denyList.join("\n");
+
+    // Load allow list
+    const allowList = await getDomainAllowList();
+    domainAllowListTextarea.value = allowList.join("\n");
   } catch (error) {
     console.error("Error loading domain lists:", error);
     domainStatusElement.textContent =
@@ -214,11 +223,21 @@ async function saveDomainLists(event: MouseEvent) {
           .filter(Boolean)
       : [];
 
+    // Parse allow list
+    const allowListText = domainAllowListTextarea.value.trim();
+    const allowList = allowListText
+      ? allowListText
+          .split("\n")
+          .map((domain) => domain.trim())
+          .filter(Boolean)
+      : [];
+
     // Save to storage
     await setDomainDenyList(denyList);
+    await setDomainAllowList(allowList);
 
     // Show success message
-    domainStatusElement.textContent = "Domain deny list saved successfully!";
+    domainStatusElement.textContent = "Domain lists saved successfully!";
     domainStatusElement.style.color = "#4caf50";
     setTimeout(() => {
       domainStatusElement.textContent = "";

@@ -8,10 +8,10 @@
         "tabGroups",
         "history",
         "storage",
-        "scripting"
+        "scripting",
+        "<all_urls>"
     ],
     "optional_permissions": [
-        "*://*/*",
         "find"
     ],
     "background": {
