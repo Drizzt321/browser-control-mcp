@@ -450,6 +450,42 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-snapshot",
+  "Get an inventory of interactive elements on a web page with CSS selectors",
+  {
+    tabId: z.number().optional().describe("Tab ID to snapshot. Default: active tab"),
+    max_elements: z.number().int().min(1).max(200).optional().describe("Maximum elements to return (default: 100, max: 200)"),
+    include_non_interactive: z.boolean().optional().describe("Include headings and images (default: false)"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before snapshot"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after snapshot"),
+  },
+  async ({ tabId, max_elements, include_non_interactive, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-snapshot",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        const result = await browserApi.snapshot(tabId, max_elements, include_non_interactive);
+        const lines = result.elements.map((el) => {
+          let line = `[${el.role}] "${el.name}" → ${el.selector}`;
+          if (el.type) line += ` (type=${el.type})`;
+          if (el.href) line += ` href=${el.href}`;
+          return line;
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Found ${result.elements.length} elements:\n${lines.join("\n")}`,
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);

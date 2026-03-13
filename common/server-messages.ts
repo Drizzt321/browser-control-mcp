@@ -94,6 +94,13 @@ export interface FillFormServerMessage extends ServerMessageBase {
   tabId?: number;
 }
 
+export interface SnapshotServerMessage extends ServerMessageBase {
+  cmd: "snapshot";
+  tabId?: number;
+  maxElements?: number;
+  includeNonInteractive?: boolean;
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -108,6 +115,7 @@ export type ServerMessage =
   | ClickServerMessage
   | TypeServerMessage
   | ScreenshotServerMessage
-  | FillFormServerMessage;
+  | FillFormServerMessage
+  | SnapshotServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

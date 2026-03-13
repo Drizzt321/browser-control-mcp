@@ -295,6 +295,25 @@ export class BrowserAPI {
     return { filled: message.filled, errors: message.errors };
   }
 
+  async snapshot(
+    tabId?: number,
+    maxElements?: number,
+    includeNonInteractive?: boolean
+  ): Promise<{ elements: Array<{ selector: string; role: string; name: string; tag: string; type?: string; href?: string }> }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "snapshot",
+      tabId,
+      maxElements,
+      includeNonInteractive,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "snapshot-result",
+      getTimeoutForCommand("snapshot")
+    );
+    return { elements: message.elements };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,
