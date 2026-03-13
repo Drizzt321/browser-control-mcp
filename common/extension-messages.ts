@@ -88,6 +88,12 @@ export interface ScreenshotResultExtensionMessage extends ExtensionMessageBase {
   mimeType: string;
 }
 
+export interface FillFormResultExtensionMessage extends ExtensionMessageBase {
+  resource: "fill-form-result";
+  filled: number;
+  errors: string[];
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -101,7 +107,8 @@ export type ExtensionMessage =
   | EvaluateResultExtensionMessage
   | ClickResultExtensionMessage
   | TypeResultExtensionMessage
-  | ScreenshotResultExtensionMessage;
+  | ScreenshotResultExtensionMessage
+  | FillFormResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

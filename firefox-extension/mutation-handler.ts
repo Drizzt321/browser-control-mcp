@@ -183,3 +183,95 @@ export async function typeInElement(
 
   return result ?? false;
 }
+
+/**
+ * Fill multiple form fields at once.
+ * Handles text inputs, textareas, selects, checkboxes, and radio buttons.
+ * Returns count of filled fields plus any errors for fields that failed.
+ */
+export async function fillForm(
+  tabId: number,
+  fields: Array<{ selector: string; value: string | boolean }>,
+  submit: boolean
+): Promise<{ filled: number; errors: string[] }> {
+  const result = await runInPage(
+    tabId,
+    (fieldList: Array<{ selector: string; value: string | boolean }>, doSubmit: boolean) => {
+      try {
+        let filled = 0;
+        const errors: string[] = [];
+        let lastForm: HTMLFormElement | null = null;
+
+        for (const field of fieldList) {
+          try {
+            const el = document.querySelector(field.selector);
+            if (!el) {
+              errors.push(`Element not found: ${field.selector}`);
+              continue;
+            }
+
+            const target = el as HTMLElement;
+            target.scrollIntoView({ block: "center", behavior: "instant" });
+            target.focus();
+
+            if (target instanceof HTMLSelectElement) {
+              target.value = String(field.value);
+              target.dispatchEvent(new Event("change", { bubbles: true }));
+            } else if (target instanceof HTMLInputElement) {
+              const inputType = target.type.toLowerCase();
+              if (inputType === "checkbox") {
+                const desired = Boolean(field.value);
+                if (target.checked !== desired) {
+                  target.checked = desired;
+                  target.dispatchEvent(new Event("input", { bubbles: true }));
+                  target.dispatchEvent(new Event("change", { bubbles: true }));
+                }
+              } else if (inputType === "radio") {
+                target.checked = true;
+                target.dispatchEvent(new Event("input", { bubbles: true }));
+                target.dispatchEvent(new Event("change", { bubbles: true }));
+              } else {
+                // text, email, password, number, tel, url, search, etc.
+                target.value = String(field.value);
+                target.dispatchEvent(new Event("input", { bubbles: true }));
+                target.dispatchEvent(new Event("change", { bubbles: true }));
+              }
+            } else if (target instanceof HTMLTextAreaElement) {
+              target.value = String(field.value);
+              target.dispatchEvent(new Event("input", { bubbles: true }));
+              target.dispatchEvent(new Event("change", { bubbles: true }));
+            } else if (target.isContentEditable) {
+              target.textContent = String(field.value);
+              target.dispatchEvent(new Event("input", { bubbles: true }));
+              target.dispatchEvent(new Event("change", { bubbles: true }));
+            } else {
+              errors.push(`Element "${field.selector}" is not a form field`);
+              continue;
+            }
+
+            const form = target.closest("form");
+            if (form) lastForm = form;
+            filled++;
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            errors.push(`${field.selector}: ${message}`);
+          }
+        }
+
+        if (doSubmit && lastForm) {
+          lastForm.requestSubmit();
+        } else if (doSubmit) {
+          errors.push("No form found to submit");
+        }
+
+        return { ok: true, value: { filled, errors } };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+    [fields, submit]
+  );
+
+  return result ?? { filled: 0, errors: ["fillForm returned no result"] };
+}

@@ -74,6 +74,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-screenshot",
     name: "Take Screenshot",
     description: "Allows the MCP server to capture screenshots of web pages"
+  },
+  {
+    id: "browser-fill-form",
+    name: "Fill Form",
+    description: "Allows the MCP server to fill multiple form fields at once"
   }
 ];
 
@@ -92,6 +97,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "click": "browser-click",
   "type": "browser-type",
   "screenshot": "browser-screenshot",
+  "fill-form": "browser-fill-form",
 };
 
 // Storage schema for tool settings
