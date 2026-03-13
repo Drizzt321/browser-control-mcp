@@ -11,6 +11,8 @@ const mockBrowser = {
     move: jest.fn(),
     update: jest.fn(),
     group: jest.fn(),
+    captureVisibleTab: jest.fn(),
+    captureTab: jest.fn(),
     onUpdated: {
       addListener: jest.fn(),
       removeListener: jest.fn(),

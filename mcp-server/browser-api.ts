@@ -257,6 +257,25 @@ export class BrowserAPI {
     return { success: message.success };
   }
 
+  async screenshot(
+    tabId?: number,
+    format?: "png" | "jpeg",
+    quality?: number
+  ): Promise<{ dataUrl: string; mimeType: string }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "screenshot",
+      tabId,
+      format,
+      quality,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "screenshot-result",
+      getTimeoutForCommand("screenshot")
+    );
+    return { dataUrl: message.dataUrl, mimeType: message.mimeType };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,

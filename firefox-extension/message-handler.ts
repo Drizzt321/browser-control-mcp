@@ -88,6 +88,14 @@ export class MessageHandler {
           req.tabId
         );
         break;
+      case "screenshot":
+        await this.takeScreenshot(
+          req.correlationId,
+          req.tabId,
+          req.format,
+          req.quality
+        );
+        break;
       default:
         const _exhaustiveCheck: never = req;
         console.error("Invalid message received:", req);
@@ -514,6 +522,55 @@ export class MessageHandler {
       resource: "type-result",
       correlationId,
       success,
+    });
+  }
+
+  private async takeScreenshot(
+    correlationId: string,
+    tabId?: number,
+    format?: "png" | "jpeg",
+    quality?: number
+  ): Promise<void> {
+    // Resolve target tab — must activate it since captureVisibleTab captures the visible tab
+    let targetTabId: number;
+    if (tabId !== undefined) {
+      targetTabId = tabId;
+    } else {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!activeTab?.id) {
+        throw new Error("No active tab found");
+      }
+      targetTabId = activeTab.id;
+    }
+
+    const tab = await browser.tabs.get(targetTabId);
+    if (tab.url && (await isDomainInDenyList(tab.url))) {
+      throw new Error("Domain in tab URL is in the deny list");
+    }
+
+    await this.checkForUrlPermission(tab.url);
+
+    const mimeType = format === "jpeg" ? "image/jpeg" : "image/png";
+    const options: browser.extensionTypes.ImageDetails = {
+      format: format === "jpeg" ? "jpeg" : "png",
+    };
+    if (format === "jpeg" && quality !== undefined) {
+      options.quality = quality;
+    }
+
+    // Use Firefox-specific captureTab API which takes a tabId directly
+    // (no need to activate the tab first, unlike captureVisibleTab)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dataUrl = await (browser.tabs as any).captureTab(targetTabId, options);
+
+    await this.client.sendResourceToServer({
+      resource: "screenshot-result",
+      correlationId,
+      dataUrl,
+      mimeType,
     });
   }
 

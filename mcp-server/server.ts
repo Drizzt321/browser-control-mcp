@@ -380,6 +380,39 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-screenshot",
+  "Capture a screenshot of the visible area of a browser tab",
+  {
+    tabId: z.number().optional().describe("Tab ID to screenshot. Default: active tab"),
+    format: z.enum(["png", "jpeg"]).optional().describe("Image format (default: png)"),
+    quality: z.number().int().min(0).max(100).optional().describe("JPEG quality 0-100 (only for jpeg format)"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before taking screenshot"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after taking screenshot"),
+  },
+  async ({ tabId, format, quality, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-screenshot",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        const result = await browserApi.screenshot(tabId, format, quality);
+        // Strip data URL prefix to get raw base64
+        const base64Data = result.dataUrl.replace(/^data:[^;]+;base64,/, "");
+        return {
+          content: [
+            {
+              type: "image",
+              data: base64Data,
+              mimeType: result.mimeType,
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);

@@ -69,6 +69,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-type",
     name: "Type Text",
     description: "Allows the MCP server to type text into input elements"
+  },
+  {
+    id: "browser-screenshot",
+    name: "Take Screenshot",
+    description: "Allows the MCP server to capture screenshots of web pages"
   }
 ];
 
@@ -86,6 +91,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "evaluate": "browser-evaluate",
   "click": "browser-click",
   "type": "browser-type",
+  "screenshot": "browser-screenshot",
 };
 
 // Storage schema for tool settings
