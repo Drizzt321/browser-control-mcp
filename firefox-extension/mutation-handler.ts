@@ -276,6 +276,81 @@ export async function fillForm(
   return result ?? { filled: 0, errors: ["fillForm returned no result"] };
 }
 
+export interface WaitForResult {
+  found: boolean;
+  elapsed_ms: number;
+}
+
+/**
+ * Wait for an element matching a CSS selector to appear in the DOM.
+ * Uses MutationObserver + polling fallback inside the page context.
+ * Resolves when element is found or timeout is reached.
+ */
+export async function waitForElement(
+  tabId: number,
+  selector: string,
+  timeoutMs: number,
+  visible: boolean
+): Promise<WaitForResult> {
+  const result = await runInPage(
+    tabId,
+    (sel: string, timeout: number, checkVisible: boolean) => {
+      return new Promise<{ ok: boolean; value: { found: boolean; elapsed_ms: number } }>((resolve) => {
+        const startTime = Date.now();
+
+        function isMatch(): boolean {
+          const el = document.querySelector(sel);
+          if (!el) return false;
+          if (!checkVisible) return true;
+          const style = window.getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden") return false;
+          const htmlEl = el as HTMLElement;
+          return htmlEl.offsetWidth > 0 || htmlEl.offsetHeight > 0;
+        }
+
+        // Check immediately
+        if (isMatch()) {
+          resolve({ ok: true, value: { found: true, elapsed_ms: Date.now() - startTime } });
+          return;
+        }
+
+        let resolved = false;
+        const done = (found: boolean) => {
+          if (resolved) return;
+          resolved = true;
+          observer.disconnect();
+          clearInterval(pollId);
+          clearTimeout(timeoutId);
+          resolve({ ok: true, value: { found, elapsed_ms: Date.now() - startTime } });
+        };
+
+        // MutationObserver for DOM changes
+        const observer = new MutationObserver(() => {
+          if (isMatch()) done(true);
+        });
+        observer.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+          attributes: checkVisible,
+        });
+
+        // Polling fallback (50ms) for cases MutationObserver might miss
+        const pollId = setInterval(() => {
+          if (isMatch()) done(true);
+        }, 50);
+
+        // Timeout
+        const timeoutId = setTimeout(() => {
+          done(false);
+        }, timeout);
+      });
+    },
+    [selector, timeoutMs, visible]
+  );
+
+  return result ?? { found: false, elapsed_ms: timeoutMs };
+}
+
 export interface SnapshotElementResult {
   selector: string;
   role: string;

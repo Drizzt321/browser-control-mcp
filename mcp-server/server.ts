@@ -486,6 +486,40 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-wait-for",
+  "Wait for an element matching a CSS selector to appear in the DOM",
+  {
+    selector: z.string().describe("CSS selector to wait for"),
+    tabId: z.number().optional().describe("Tab ID to wait in. Default: active tab"),
+    timeout_ms: z.number().int().min(100).max(30000).optional().describe("Timeout in ms (default: 5000, max: 30000)"),
+    visible: z.boolean().optional().describe("If true, element must also be visible (default: false)"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before waiting"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after waiting"),
+  },
+  async ({ selector, tabId, timeout_ms, visible, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-wait-for",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        const result = await browserApi.waitFor(selector, tabId, timeout_ms, visible);
+        const status = result.found
+          ? `Element "${selector}" found after ${result.elapsed_ms}ms`
+          : `Element "${selector}" not found within ${result.elapsed_ms}ms`;
+        return {
+          content: [
+            {
+              type: "text",
+              text: status,
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);

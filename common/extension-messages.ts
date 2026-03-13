@@ -108,6 +108,12 @@ export interface SnapshotResultExtensionMessage extends ExtensionMessageBase {
   elements: SnapshotElement[];
 }
 
+export interface WaitForResultExtensionMessage extends ExtensionMessageBase {
+  resource: "wait-for-result";
+  found: boolean;
+  elapsed_ms: number;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -123,7 +129,8 @@ export type ExtensionMessage =
   | TypeResultExtensionMessage
   | ScreenshotResultExtensionMessage
   | FillFormResultExtensionMessage
-  | SnapshotResultExtensionMessage;
+  | SnapshotResultExtensionMessage
+  | WaitForResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

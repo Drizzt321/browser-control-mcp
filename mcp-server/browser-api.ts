@@ -314,6 +314,27 @@ export class BrowserAPI {
     return { elements: message.elements };
   }
 
+  async waitFor(
+    selector: string,
+    tabId?: number,
+    timeoutMs?: number,
+    visible?: boolean
+  ): Promise<{ found: boolean; elapsed_ms: number }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "wait-for",
+      selector,
+      tabId,
+      timeoutMs,
+      visible,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "wait-for-result",
+      getTimeoutForCommand("wait-for")
+    );
+    return { found: message.found, elapsed_ms: message.elapsed_ms };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,
