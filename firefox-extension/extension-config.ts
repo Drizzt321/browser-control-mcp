@@ -84,6 +84,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "browser-snapshot",
     name: "Page Snapshot",
     description: "Allows the MCP server to get an inventory of interactive elements on the page"
+  },
+  {
+    id: "browser-wait-for",
+    name: "Wait For Element",
+    description: "Allows the MCP server to wait for an element to appear in the DOM"
   }
 ];
 
@@ -104,6 +109,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "screenshot": "browser-screenshot",
   "fill-form": "browser-fill-form",
   "snapshot": "browser-snapshot",
+  "wait-for": "browser-wait-for",
 };
 
 // Storage schema for tool settings

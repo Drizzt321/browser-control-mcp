@@ -101,6 +101,14 @@ export interface SnapshotServerMessage extends ServerMessageBase {
   includeNonInteractive?: boolean;
 }
 
+export interface WaitForServerMessage extends ServerMessageBase {
+  cmd: "wait-for";
+  selector: string;
+  tabId?: number;
+  timeoutMs?: number;
+  visible?: boolean;
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -116,6 +124,7 @@ export type ServerMessage =
   | TypeServerMessage
   | ScreenshotServerMessage
   | FillFormServerMessage
-  | SnapshotServerMessage;
+  | SnapshotServerMessage
+  | WaitForServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

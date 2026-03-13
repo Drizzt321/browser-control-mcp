@@ -1,7 +1,7 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
 import { isCommandAllowed, isDomainInDenyList, isDomainAllowed, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
-import { evaluateInPage, clickElement, typeInElement, fillForm, getSnapshot } from "./mutation-handler";
+import { evaluateInPage, clickElement, typeInElement, fillForm, getSnapshot, waitForElement } from "./mutation-handler";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -110,6 +110,15 @@ export class MessageHandler {
           req.tabId,
           req.maxElements,
           req.includeNonInteractive
+        );
+        break;
+      case "wait-for":
+        await this.waitForSelector(
+          req.correlationId,
+          req.selector,
+          req.tabId,
+          req.timeoutMs,
+          req.visible
         );
         break;
       default:
@@ -693,6 +702,50 @@ export class MessageHandler {
       resource: "snapshot-result",
       correlationId,
       elements,
+    });
+  }
+
+  private async waitForSelector(
+    correlationId: string,
+    selector: string,
+    tabId?: number,
+    timeoutMs?: number,
+    visible?: boolean
+  ): Promise<void> {
+    // Resolve target tab
+    let targetTabId: number;
+    if (tabId !== undefined) {
+      targetTabId = tabId;
+    } else {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!activeTab?.id) {
+        throw new Error("No active tab found");
+      }
+      targetTabId = activeTab.id;
+    }
+
+    const tab = await browser.tabs.get(targetTabId);
+    if (tab.url) {
+      await this.checkDomainAccess(tab.url);
+    }
+
+    await this.checkForUrlPermission(tab.url);
+
+    const result = await waitForElement(
+      targetTabId,
+      selector,
+      timeoutMs ?? 5000,
+      visible ?? false
+    );
+
+    await this.client.sendResourceToServer({
+      resource: "wait-for-result",
+      correlationId,
+      found: result.found,
+      elapsed_ms: result.elapsed_ms,
     });
   }
 

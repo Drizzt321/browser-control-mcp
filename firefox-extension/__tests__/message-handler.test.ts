@@ -1230,5 +1230,120 @@ describe("MessageHandler", () => {
         expect(browser.scripting.executeScript).not.toHaveBeenCalled();
       });
     });
+
+    describe("wait-for command", () => {
+      it("should wait for element in the active tab and return found", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "wait-for",
+          selector: "#dynamic-element",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockActiveTab = { id: 42, url: "https://example.com" };
+        (browser.tabs.query as jest.Mock).mockResolvedValue([mockActiveTab]);
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockActiveTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: { found: true, elapsed_ms: 12 } } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.scripting.executeScript).toHaveBeenCalled();
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "wait-for-result",
+          correlationId: "test-correlation-id",
+          found: true,
+          elapsed_ms: 12,
+        });
+      });
+
+      it("should wait for element in a specific tab by tabId", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "wait-for",
+          selector: ".loaded",
+          tabId: 99,
+          timeoutMs: 10000,
+          visible: true,
+          correlationId: "test-correlation-id",
+        };
+
+        const mockTab = { id: 99, url: "https://example.com" };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: { found: true, elapsed_ms: 250 } } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.tabs.query).not.toHaveBeenCalled();
+        expect(browser.scripting.executeScript).toHaveBeenCalledWith(
+          expect.objectContaining({
+            target: { tabId: 99 },
+          })
+        );
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "wait-for-result",
+          correlationId: "test-correlation-id",
+          found: true,
+          elapsed_ms: 250,
+        });
+      });
+
+      it("should return found: false when element not found within timeout", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "wait-for",
+          selector: "#never-exists",
+          tabId: 42,
+          timeoutMs: 1000,
+          correlationId: "test-correlation-id",
+        };
+
+        const mockTab = { id: 42, url: "https://example.com" };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: { found: false, elapsed_ms: 1000 } } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "wait-for-result",
+          correlationId: "test-correlation-id",
+          found: false,
+          elapsed_ms: 1000,
+        });
+      });
+
+      it("should throw if tab domain is in deny list", async () => {
+        const configWithDenyList = {
+          secret: "test-secret",
+          domainDenyList: ["evil.com"],
+          ports: [8089],
+        };
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: configWithDenyList,
+        });
+
+        const request: ServerMessageRequest = {
+          cmd: "wait-for",
+          selector: "#target",
+          tabId: 99,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 99,
+          url: "https://evil.com",
+        });
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Domain in user defined deny list");
+        expect(browser.scripting.executeScript).not.toHaveBeenCalled();
+      });
+    });
   });
 });
