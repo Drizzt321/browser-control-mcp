@@ -166,7 +166,7 @@ export class MessageHandler {
   // This will open the options page with a URL parameter to request permission
   // and throw an error to indicate that the request cannot proceed until permission is granted.
   private async checkForUrlPermission(url: string | undefined): Promise<void> {
-    if (url) {
+    if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
       const origin = new URL(url).origin;
       const granted = await browser.permissions.contains({
         origins: [`${origin}/*`],
