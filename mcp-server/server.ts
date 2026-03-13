@@ -413,6 +413,43 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "browser-fill-form",
+  "Fill multiple form fields at once on a web page",
+  {
+    fields: z.array(z.object({
+      selector: z.string().describe("CSS selector for the form field"),
+      value: z.union([z.string(), z.boolean()]).describe("Value to set (string for text/select, boolean for checkbox/radio)"),
+    })).describe("Array of fields to fill"),
+    submit: z.boolean().optional().describe("Submit the form after filling (default: false)"),
+    tabId: z.number().optional().describe("Tab ID to fill form in. Default: active tab"),
+    delay_before_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms before filling"),
+    delay_after_ms: z.number().int().min(0).max(60000).optional().describe("Delay in ms after filling"),
+  },
+  async ({ fields, submit, tabId, delay_before_ms, delay_after_ms }) => {
+    return adapter.execute(
+      getSessionId(),
+      "browser-fill-form",
+      { tabId, delayBeforeMs: delay_before_ms, delayAfterMs: delay_after_ms },
+      async () => {
+        const result = await browserApi.fillForm(fields, submit, tabId);
+        const parts: string[] = [`Filled ${result.filled}/${fields.length} fields`];
+        if (result.errors.length > 0) {
+          parts.push(`Errors: ${result.errors.join("; ")}`);
+        }
+        return {
+          content: [
+            {
+              type: "text",
+              text: parts.join(". "),
+            },
+          ],
+        };
+      }
+    );
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);

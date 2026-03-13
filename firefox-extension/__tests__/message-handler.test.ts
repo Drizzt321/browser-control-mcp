@@ -1070,5 +1070,86 @@ describe("MessageHandler", () => {
         expect(browser.tabs.captureTab).not.toHaveBeenCalled();
       });
     });
+
+    describe("fill-form command", () => {
+      it("should fill form fields in the active tab", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "fill-form",
+          fields: [
+            { selector: "#name", value: "John" },
+            { selector: "#agree", value: true },
+          ],
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: { filled: 2, errors: [] } } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith(
+          expect.objectContaining({
+            resource: "fill-form-result",
+            correlationId: "test-correlation-id",
+            filled: 2,
+            errors: [],
+          })
+        );
+      });
+
+      it("should fill form in a specific tab by tabId", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "fill-form",
+          fields: [{ selector: "#email", value: "test@example.com" }],
+          tabId: 42,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 42,
+          url: "https://example.com",
+        });
+        (browser.scripting.executeScript as jest.Mock).mockResolvedValue([
+          { result: { ok: true, value: { filled: 1, errors: [] } } },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.scripting.executeScript).toHaveBeenCalledWith(
+          expect.objectContaining({
+            target: { tabId: 42 },
+          })
+        );
+      });
+
+      it("should throw if tab domain is in deny list", async () => {
+        const configWithDenyList = {
+          secret: "test-secret",
+          domainDenyList: ["evil.com"],
+          ports: [8089],
+        };
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: configWithDenyList,
+        });
+
+        const request: ServerMessageRequest = {
+          cmd: "fill-form",
+          fields: [{ selector: "#name", value: "test" }],
+          tabId: 99,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 99,
+          url: "https://evil.com",
+        });
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Domain in user defined deny list");
+        expect(browser.scripting.executeScript).not.toHaveBeenCalled();
+      });
+    });
   });
 });

@@ -276,6 +276,25 @@ export class BrowserAPI {
     return { dataUrl: message.dataUrl, mimeType: message.mimeType };
   }
 
+  async fillForm(
+    fields: Array<{ selector: string; value: string | boolean }>,
+    submit?: boolean,
+    tabId?: number
+  ): Promise<{ filled: number; errors: string[] }> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "fill-form",
+      fields,
+      submit,
+      tabId,
+    });
+    const message = await this.waitForResponse(
+      correlationId,
+      "fill-form-result",
+      getTimeoutForCommand("fill-form")
+    );
+    return { filled: message.filled, errors: message.errors };
+  }
+
   async groupTabs(
     tabIds: number[],
     isCollapsed: boolean,

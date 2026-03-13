@@ -82,6 +82,18 @@ export interface ScreenshotServerMessage extends ServerMessageBase {
   quality?: number;
 }
 
+export interface FillFormField {
+  selector: string;
+  value: string | boolean;
+}
+
+export interface FillFormServerMessage extends ServerMessageBase {
+  cmd: "fill-form";
+  fields: FillFormField[];
+  submit?: boolean;
+  tabId?: number;
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -95,6 +107,7 @@ export type ServerMessage =
   | EvaluateServerMessage
   | ClickServerMessage
   | TypeServerMessage
-  | ScreenshotServerMessage;
+  | ScreenshotServerMessage
+  | FillFormServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };
