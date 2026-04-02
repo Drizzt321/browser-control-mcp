@@ -421,21 +421,31 @@ export class MessageHandler {
     // Navigate and wait for load
     await browser.tabs.update(targetTabId, { url });
 
-    // Wait for the tab to finish loading
+    // Wait for the tab to finish loading.
+    // Firefox tabs.onUpdated fires "loading" very early (before URL commits)
+    // and "complete" when fully loaded. For "domcontentloaded" we wait for
+    // "complete" as well, since Firefox doesn't expose a DOMContentLoaded
+    // status — waiting for "loading" returns stale tab URL/title.
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         browser.tabs.onUpdated.removeListener(listener);
         reject(new Error("Navigation timed out"));
       }, 30000);
 
-      const targetStatus =
-        waitUntil === "domcontentloaded" ? "loading" : "complete";
+      let urlCommitted = false;
 
       const listener = (
         updatedTabId: number,
         changeInfo: browser.tabs._OnUpdatedChangeInfo
       ) => {
-        if (updatedTabId === targetTabId && changeInfo.status === targetStatus) {
+        if (updatedTabId !== targetTabId) return;
+
+        // Track when the URL has committed to the new page
+        if (changeInfo.url) {
+          urlCommitted = true;
+        }
+
+        if (changeInfo.status === "complete" && urlCommitted) {
           clearTimeout(timeout);
           browser.tabs.onUpdated.removeListener(listener);
           resolve();
@@ -444,7 +454,7 @@ export class MessageHandler {
       browser.tabs.onUpdated.addListener(listener);
     });
 
-    // Get final tab info
+    // Get final tab info — URL and title are now reliable
     const tab = await browser.tabs.get(targetTabId);
 
     await this.client.sendResourceToServer({
