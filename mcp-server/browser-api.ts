@@ -41,10 +41,15 @@ interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
   reject: (reason?: string) => void;
 }
 
+const RECONNECT_WAIT_MS = 12000;
+const RECONNECT_POLL_MS = 2000;
+
 export class BrowserAPI {
   private ws: WebSocket | null = null;
   private wsServer: WebSocket.Server | null = null;
   private sharedSecret: string | null = null;
+  private lastConnectionTime: number = 0;
+  private lastDisconnectTime: number = 0;
 
   // Map to persist the request to the extension. It maps the request correlationId
   // to a resolver, fulfulling a promise created when sending a message to the extension.
@@ -79,8 +84,9 @@ export class BrowserAPI {
     console.error(`Starting WebSocket server on ${host}:${port}`);
     this.wsServer.on("connection", async (connection) => {
       this.ws = connection;
+      this.lastConnectionTime = Date.now();
 
-      console.error("WebSocket connection established on port", port);
+      console.error("[browser-mcp] WebSocket connection established on port", port);
 
       this.ws.on("message", (message) => {
         const decoded = JSON.parse(message.toString());
@@ -90,14 +96,25 @@ export class BrowserAPI {
         }
         const signature = this.createSignature(JSON.stringify(decoded.payload));
         if (signature !== decoded.signature) {
-          console.error("Invalid message signature");
+          console.error("[browser-mcp] Invalid message signature");
           return;
         }
         this.handleDecodedExtensionMessage(decoded.payload);
       });
+
+      this.ws.on("close", (code, reason) => {
+        const duration = Date.now() - this.lastConnectionTime;
+        console.error(`[browser-mcp] WebSocket closed: code=${code} reason=${reason} connection_duration_ms=${duration}`);
+        this.ws = null;
+        this.lastDisconnectTime = Date.now();
+      });
+
+      this.ws.on("error", (error) => {
+        console.error("[browser-mcp] WebSocket connection error:", error);
+      });
     });
     this.wsServer.on("error", (error) => {
-      console.error("WebSocket server error:", error);
+      console.error("[browser-mcp] WebSocket server error:", error);
     });
   }
 
@@ -110,7 +127,7 @@ export class BrowserAPI {
   }
 
   async openTab(url: string): Promise<number | undefined> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "open-tab",
       url,
     });
@@ -119,7 +136,7 @@ export class BrowserAPI {
   }
 
   async closeTabs(tabIds: number[]) {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "close-tabs",
       tabIds,
     });
@@ -127,7 +144,7 @@ export class BrowserAPI {
   }
 
   async getTabList(): Promise<BrowserTab[]> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "get-tab-list",
     });
     const message = await this.waitForResponse(correlationId, "tabs");
@@ -137,7 +154,7 @@ export class BrowserAPI {
   async getBrowserRecentHistory(
     searchQuery?: string
   ): Promise<BrowserHistoryItem[]> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "get-browser-recent-history",
       searchQuery,
     });
@@ -149,7 +166,7 @@ export class BrowserAPI {
     tabId: number,
     offset: number
   ): Promise<TabContentExtensionMessage> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "get-tab-content",
       tabId,
       offset,
@@ -158,7 +175,7 @@ export class BrowserAPI {
   }
 
   async reorderTabs(tabOrder: number[]): Promise<number[]> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "reorder-tabs",
       tabOrder,
     });
@@ -167,7 +184,7 @@ export class BrowserAPI {
   }
 
   async findHighlight(tabId: number, queryPhrase: string): Promise<number> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "find-highlight",
       tabId,
       queryPhrase,
@@ -184,7 +201,7 @@ export class BrowserAPI {
     tabId?: number,
     waitUntil?: "load" | "domcontentloaded"
   ): Promise<{ url: string; title: string }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "navigate",
       url,
       tabId,
@@ -202,7 +219,7 @@ export class BrowserAPI {
     script: string,
     tabId?: number
   ): Promise<{ result: string }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "evaluate",
       script,
       tabId,
@@ -220,7 +237,7 @@ export class BrowserAPI {
     description?: string,
     tabId?: number
   ): Promise<{ success: boolean }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "click",
       selector,
       description,
@@ -241,7 +258,7 @@ export class BrowserAPI {
     submit?: boolean,
     tabId?: number
   ): Promise<{ success: boolean }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "type",
       selector,
       text,
@@ -262,7 +279,7 @@ export class BrowserAPI {
     format?: "png" | "jpeg",
     quality?: number
   ): Promise<{ dataUrl: string; mimeType: string }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "screenshot",
       tabId,
       format,
@@ -281,7 +298,7 @@ export class BrowserAPI {
     submit?: boolean,
     tabId?: number
   ): Promise<{ filled: number; errors: string[] }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "fill-form",
       fields,
       submit,
@@ -300,7 +317,7 @@ export class BrowserAPI {
     maxElements?: number,
     includeNonInteractive?: boolean
   ): Promise<{ elements: Array<{ selector: string; role: string; name: string; tag: string; type?: string; href?: string }> }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "snapshot",
       tabId,
       maxElements,
@@ -320,7 +337,7 @@ export class BrowserAPI {
     timeoutMs?: number,
     visible?: boolean
   ): Promise<{ found: boolean; elapsed_ms: number }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "wait-for",
       selector,
       tabId,
@@ -341,7 +358,7 @@ export class BrowserAPI {
     sinceMs?: number,
     limit?: number
   ): Promise<{ requests: Array<{ method: string; url: string; status: number; duration_ms: number; timestamp: number }> }> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "get-network-requests",
       tabId,
       filterUrl,
@@ -362,7 +379,7 @@ export class BrowserAPI {
     groupColor: string,
     groupTitle: string
   ): Promise<number> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "group-tabs",
       tabIds,
       isCollapsed,
@@ -382,9 +399,19 @@ export class BrowserAPI {
     return hmac.digest("hex");
   }
 
-  private sendMessageToExtension(message: ServerMessage): string {
+  private async sendMessageToExtension(message: ServerMessage): Promise<string> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error("WebSocket is not open");
+      console.error(`[browser-mcp] WebSocket not connected, waiting up to ${RECONNECT_WAIT_MS}ms for extension reconnect...`);
+      await this.waitForReconnect();
+    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      const disconnectedFor = this.lastDisconnectTime
+        ? `${Date.now() - this.lastDisconnectTime}ms`
+        : "unknown";
+      throw new Error(
+        `Not connected — extension did not reconnect within ${RECONNECT_WAIT_MS}ms ` +
+        `(disconnected for ${disconnectedFor})`
+      );
     }
 
     const correlationId = Math.random().toString(36).substring(2);
@@ -400,6 +427,26 @@ export class BrowserAPI {
     this.ws.send(JSON.stringify(signedMessage));
 
     return correlationId;
+  }
+
+  private waitForReconnect(): Promise<void> {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      const check = () => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          console.error(`[browser-mcp] Extension reconnected after ${Date.now() - start}ms`);
+          resolve();
+          return;
+        }
+        if (Date.now() - start >= RECONNECT_WAIT_MS) {
+          console.error(`[browser-mcp] Extension did not reconnect within ${RECONNECT_WAIT_MS}ms`);
+          resolve();
+          return;
+        }
+        setTimeout(check, RECONNECT_POLL_MS);
+      };
+      setTimeout(check, RECONNECT_POLL_MS);
+    });
   }
 
   private handleDecodedExtensionMessage(decoded: ExtensionMessage) {
@@ -435,7 +482,7 @@ export class BrowserAPI {
         });
         setTimeout(() => {
           this.extensionRequestMap.delete(correlationId);
-          reject("Timed out waiting for response");
+          reject(`Timed out waiting for ${resource} response (correlationId=${correlationId}, timeout=${timeout}ms)`);
         }, timeout);
       }
     );
