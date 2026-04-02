@@ -50,6 +50,7 @@ export class BrowserAPI {
   private sharedSecret: string | null = null;
   private lastConnectionTime: number = 0;
   private lastDisconnectTime: number = 0;
+  private extensionVersion: string | null = null;
 
   // Map to persist the request to the extension. It maps the request correlationId
   // to a resolver, fulfulling a promise created when sending a message to the extension.
@@ -88,8 +89,10 @@ export class BrowserAPI {
 
       console.error("[browser-mcp] WebSocket connection established on port", port);
 
-      // Query extension version
-      this.queryExtensionVersion().catch((err) => {
+      // Query extension version and store it
+      this.queryExtensionVersion().then((version) => {
+        this.extensionVersion = version;
+      }).catch((err) => {
         console.error("[browser-mcp] Failed to query extension version:", err);
       });
 
@@ -131,12 +134,22 @@ export class BrowserAPI {
     return this.wsServer?.options.port;
   }
 
-  private async queryExtensionVersion(): Promise<void> {
-    const correlationId = await this.sendMessageToExtension({
-      cmd: "get-version",
-    });
-    const message = await this.waitForResponse(correlationId, "version-result");
-    console.error(`[browser-mcp] Extension version: ${message.version}`);
+  private async queryExtensionVersion(): Promise<string | null> {
+    try {
+      const correlationId = await this.sendMessageToExtension({
+        cmd: "get-version",
+      });
+      const message = await this.waitForResponse(correlationId, "version-result");
+      console.error(`[browser-mcp] Extension version: ${message.version}`);
+      return message.version;
+    } catch {
+      console.error("[browser-mcp] Failed to query extension version");
+      return null;
+    }
+  }
+
+  async getExtensionVersion(): Promise<string | null> {
+    return this.extensionVersion;
   }
 
   async openTab(url: string): Promise<number | undefined> {

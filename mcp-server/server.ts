@@ -572,6 +572,26 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "get-version-info",
+  "Get version information for the MCP server and browser extension",
+  {},
+  async () => {
+    const extensionVersion = await browserApi.getExtensionVersion();
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            mcp_server_version: SERVER_VERSION,
+            extension_version: extensionVersion ?? "unknown",
+          }),
+        },
+      ],
+    };
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);
