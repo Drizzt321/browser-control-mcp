@@ -116,6 +116,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "snapshot": "browser-snapshot",
   "wait-for": "browser-wait-for",
   "get-network-requests": "browser-network-requests",
+  "get-version": "get-version",
 };
 
 // Storage schema for tool settings

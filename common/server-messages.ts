@@ -117,6 +117,10 @@ export interface GetNetworkRequestsServerMessage extends ServerMessageBase {
   limit?: number;
 }
 
+export interface GetVersionServerMessage extends ServerMessageBase {
+  cmd: "get-version";
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -134,6 +138,7 @@ export type ServerMessage =
   | FillFormServerMessage
   | SnapshotServerMessage
   | WaitForServerMessage
-  | GetNetworkRequestsServerMessage;
+  | GetNetworkRequestsServerMessage
+  | GetVersionServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

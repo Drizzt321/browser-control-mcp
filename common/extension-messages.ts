@@ -127,6 +127,11 @@ export interface NetworkRequestsResultExtensionMessage extends ExtensionMessageB
   requests: NetworkRequest[];
 }
 
+export interface VersionResultExtensionMessage extends ExtensionMessageBase {
+  resource: "version-result";
+  version: string;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -144,7 +149,8 @@ export type ExtensionMessage =
   | FillFormResultExtensionMessage
   | SnapshotResultExtensionMessage
   | WaitForResultExtensionMessage
-  | NetworkRequestsResultExtensionMessage;
+  | NetworkRequestsResultExtensionMessage
+  | VersionResultExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

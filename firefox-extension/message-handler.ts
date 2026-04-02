@@ -130,6 +130,9 @@ export class MessageHandler {
           req.limit
         );
         break;
+      case "get-version":
+        await this.getVersion(req.correlationId);
+        break;
       default:
         const _exhaustiveCheck: never = req;
         console.error("Invalid message received:", req);
@@ -832,6 +835,15 @@ export class MessageHandler {
       resource: "new-tab-group",
       correlationId,
       groupId: tabGroup.id,
+    });
+  }
+
+  private async getVersion(correlationId: string): Promise<void> {
+    const manifest = browser.runtime.getManifest();
+    await this.client.sendResourceToServer({
+      resource: "version-result",
+      correlationId,
+      version: manifest.version,
     });
   }
 }

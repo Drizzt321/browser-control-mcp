@@ -88,6 +88,11 @@ export class BrowserAPI {
 
       console.error("[browser-mcp] WebSocket connection established on port", port);
 
+      // Query extension version
+      this.queryExtensionVersion().catch((err) => {
+        console.error("[browser-mcp] Failed to query extension version:", err);
+      });
+
       this.ws.on("message", (message) => {
         const decoded = JSON.parse(message.toString());
         if (isErrorMessage(decoded)) {
@@ -124,6 +129,14 @@ export class BrowserAPI {
 
   getSelectedPort() {
     return this.wsServer?.options.port;
+  }
+
+  private async queryExtensionVersion(): Promise<void> {
+    const correlationId = await this.sendMessageToExtension({
+      cmd: "get-version",
+    });
+    const message = await this.waitForResponse(correlationId, "version-result");
+    console.error(`[browser-mcp] Extension version: ${message.version}`);
   }
 
   async openTab(url: string): Promise<number | undefined> {
