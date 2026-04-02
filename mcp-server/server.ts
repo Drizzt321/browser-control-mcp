@@ -7,8 +7,16 @@ import { StaticSessionManager } from "./session";
 import { SingleSessionOwnership } from "./tab-ownership";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 dayjs.extend(relativeTime);
+
+// Read version from package.json
+const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
+const SERVER_VERSION = pkg.version ?? "unknown";
+
+console.error(`[browser-mcp] MCP server starting — version=${SERVER_VERSION}`);
 
 const sessionManager = new StaticSessionManager();
 const tabOwnership = new SingleSessionOwnership();
@@ -20,7 +28,7 @@ function getSessionId(): string {
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
-  version: "1.5.1",
+  version: SERVER_VERSION,
 });
 
 mcpServer.tool(

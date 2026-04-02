@@ -81,7 +81,7 @@ export class BrowserAPI {
       port,
     });
 
-    console.error(`Starting WebSocket server on ${host}:${port}`);
+    console.error(`[browser-mcp] WebSocket server listening on ${host}:${port}`);
     this.wsServer.on("connection", async (connection) => {
       this.ws = connection;
       this.lastConnectionTime = Date.now();
