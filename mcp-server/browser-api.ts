@@ -477,20 +477,30 @@ export class BrowserAPI {
 
   private handleDecodedExtensionMessage(decoded: ExtensionMessage) {
     const { correlationId } = decoded;
-    const { resolve, resource } = this.extensionRequestMap.get(correlationId)!;
-    if (resource !== decoded.resource) {
-      console.error("Resource mismatch:", resource, decoded.resource);
+    const entry = this.extensionRequestMap.get(correlationId);
+    if (!entry) {
+      // Late response after timeout — already cleaned up, ignore
+      console.error(`[browser-mcp] Late response for correlationId=${correlationId} (already timed out), ignoring`);
+      return;
+    }
+    if (entry.resource !== decoded.resource) {
+      console.error("Resource mismatch:", entry.resource, decoded.resource);
       return;
     }
     this.extensionRequestMap.delete(correlationId);
-    resolve(decoded);
+    entry.resolve(decoded);
   }
 
   private handleExtensionError(decoded: ExtensionError) {
     const { correlationId, errorMessage } = decoded;
-    const { reject } = this.extensionRequestMap.get(correlationId)!;
+    const entry = this.extensionRequestMap.get(correlationId);
+    if (!entry) {
+      // Late error after timeout — already cleaned up, ignore
+      console.error(`[browser-mcp] Late error for correlationId=${correlationId} (already timed out): ${errorMessage}`);
+      return;
+    }
     this.extensionRequestMap.delete(correlationId);
-    reject(errorMessage);
+    entry.reject(errorMessage);
   }
 
   private async waitForResponse<T extends ExtensionMessage["resource"]>(
